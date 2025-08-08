@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "Go Download",
+  "description": "A Multithreading File Download Helper",
+  "version": "0.1.0",
+  "permissions": [
+    "contextMenus",
+    "activeTab",
+    "storage"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:11235/*"
+  ],
+  "author": "howardliu.go@outlook.com",
+  "background": {
+    "service_worker": "js/background.js"
+  },
+  "action": {
+    "default_popup": "options/options.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "js/content.js"
+      ]
+    }
+  ],
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+  "icons": {
+    "16": "icons/favicon-16x16.png",
+    "32": "icons/favicon-32x32.png",
+    "96": "icons/favicon-96x96.png"
+  }
+}

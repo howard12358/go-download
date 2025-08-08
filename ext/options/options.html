@@ -1,0 +1,101 @@
+<!--<!DOCTYPE html>-->
+<!--<html lang="zh-CN">-->
+<!--<head>-->
+<!--    <meta charset="UTF-8"/>-->
+<!--    <title>Go Download 扩展</title>-->
+<!--    <link rel="stylesheet" href="options.css"/>-->
+<!--</head>-->
+<!--<body>-->
+<!--&lt;!&ndash; 下载历史（默认展开） &ndash;&gt;-->
+<!--<details open>-->
+<!--    <summary>下载历史</summary>-->
+<!--    <div class="panel">-->
+<!--        <ul id="historyList" class="history-list">-->
+<!--            &lt;!&ndash; JS 动态填充历史记录 &ndash;&gt;-->
+<!--            <div class="progress-container">-->
+<!--                <div id="progressBar" class="progress-bar"></div>-->
+<!--            </div>-->
+<!--        </ul>-->
+<!--    </div>-->
+<!--</details>-->
+
+<!--&lt;!&ndash; 扩展设置（默认折叠） &ndash;&gt;-->
+<!--<details>-->
+<!--    <summary>扩展设置</summary>-->
+<!--    <div class="panel">-->
+<!--        <div class="field">-->
+<!--            <label for="downloadPath">下载目录</label>-->
+<!--            <div class="input-group">-->
+<!--                <input type="text" id="downloadPath" placeholder="Your Download Path"/>-->
+<!--                <button id="browseBtn" type="button">浏览…</button>-->
+<!--            </div>-->
+<!--        </div>-->
+<!--        <div class="field">-->
+<!--            <label for="proxyUrl">代理地址</label>-->
+<!--            <div class="input-group">-->
+<!--                <input type="text" id="proxyUrl" placeholder="http://127.0.0.1:7897"/>-->
+<!--            </div>-->
+<!--        </div>-->
+<!--        <button id="saveBtn">保存设置</button>-->
+<!--        <div id="status"></div>-->
+<!--    </div>-->
+<!--</details>-->
+
+<!--<script src="options.js"></script>-->
+<!--</body>-->
+<!--</html>-->
+
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Go Download 扩展</title>
+    <link rel="stylesheet" href="options.css"/>
+</head>
+<body>
+<!-- 下载历史（默认展开） -->
+<details open>
+    <summary>下载历史</summary>
+    <div class="panel">
+        <!-- 主进度条（显示最近任务或被点击任务的进度） -->
+        <div class="progress-container" style="margin-bottom:8px;">
+            <div style="background:#eee; height:10px; width:100%; border-radius:6px; overflow:hidden;">
+                <div id="progressBar" class="progress-bar"
+                     style="width:0%; height:100%; background:#4caf50; color:#fff; font-size:10px; text-align:center; line-height:10px;">
+                    0%
+                </div>
+            </div>
+        </div>
+
+        <ul id="historyList" class="history-list">
+            <!-- JS 动态填充历史记录 -->
+        </ul>
+    </div>
+</details>
+
+<!-- 扩展设置（默认折叠） -->
+<details>
+    <summary>扩展设置</summary>
+    <div class="panel">
+        <div class="field">
+            <label for="downloadPath">下载目录</label>
+            <div class="input-group">
+                <input type="text" id="downloadPath" placeholder="Your Download Path"/>
+                <button id="browseBtn" type="button">浏览…</button>
+            </div>
+        </div>
+        <div class="field">
+            <label for="proxyUrl">代理地址</label>
+            <div class="input-group">
+                <input type="text" id="proxyUrl" placeholder="http://127.0.0.1:7897"/>
+            </div>
+        </div>
+        <button id="saveBtn">保存设置</button>
+        <div id="status"></div>
+    </div>
+</details>
+
+<script src="options.js"></script>
+</body>
+</html>
