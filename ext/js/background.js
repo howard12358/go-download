@@ -122,36 +122,38 @@ function openProgressSSE(id) {
 
         evt.onmessage = e => {
             const percent = Number(e.data);
-            // 1) 持久化最新进度，页面打开时可恢复
-            chrome.storage.local.set({ ['gd_progress_' + id]: percent });
+            // persist latest progress
+            chrome.storage.local.set({['gd_progress_' + id]: percent});
+            chrome.storage.local.set({'gd_last_id': id});
 
-            // 2) 记录为最近任务 id（方便 options/popup 恢复）
-            chrome.storage.local.set({ 'gd_last_id': id });
-
-            // 3) 转发给任何已打开的扩展页面（popup/options）
+            // forward to any open pages, but with callback to swallow "no receiver" error
             chrome.runtime.sendMessage({
                 type: 'DOWNLOAD_PROGRESS',
                 id,
                 percent
+            }, () => {
+                // if no receiver, chrome.runtime.lastError will be set — ignore it
+                if (chrome.runtime.lastError) {
+                    // console.debug('No receiver for DOWNLOAD_PROGRESS (normal):', chrome.runtime.lastError.message);
+                }
             });
 
-            // 4) 如果完成，关闭并清理
             if (percent >= 100) {
                 try {
                     evt.close();
-                } catch (err) { /* ignore */ }
+                } catch (err) {
+                }
                 sseMap.delete(id);
             }
         };
 
         evt.onerror = err => {
             console.warn('SSE error for', id, err);
-            // 失败时关闭并尝试短延迟后重连（简单策略）
             try {
                 evt.close();
-            } catch (e) {}
+            } catch (e) {
+            }
             sseMap.delete(id);
-            // 可选：短延迟后重连
             setTimeout(() => {
                 if (!sseMap.has(id)) openProgressSSE(id);
             }, 3000);
@@ -161,13 +163,14 @@ function openProgressSSE(id) {
     }
 }
 
+
 // 安全地把历史插入 storage.local.history（最新在前，最多保存 50 条）
 function pushHistoryEntry(entry) {
-    chrome.storage.local.get({ history: [] }, res => {
+    chrome.storage.local.get({history: []}, res => {
         const hist = res.history || [];
         hist.unshift(entry);
         if (hist.length > 50) hist.length = 50;
-        chrome.storage.local.set({ history: hist });
+        chrome.storage.local.set({history: hist});
     });
 }
 
@@ -186,27 +189,27 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     if (info.menuItemId !== 'download-link' || !info.linkUrl) return;
 
     // 读取设置（下载目录 / 代理地址）
-    chrome.storage.sync.get({ downloadPath: '', proxyUrl: '' }, prefs => {
-        const { downloadPath, proxyUrl } = prefs;
-        const body = { url: info.linkUrl };
+    chrome.storage.sync.get({downloadPath: '', proxyUrl: ''}, prefs => {
+        const {downloadPath, proxyUrl} = prefs;
+        const body = {url: info.linkUrl};
         if (downloadPath) body.downloadPath = downloadPath;
         if (proxyUrl) body.proxyUrl = proxyUrl;
 
         fetch(`${SERVER_BASE}/download`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(body)
         })
             .then(r => r.json())
             .then(data => {
-                const { id, status } = data || {};
+                const {id, status} = data || {};
                 if (status === 'success' && id) {
                     console.log('已推送到下载队列:', info.linkUrl, id);
                     // 记录历史（包含 id 和 url）
-                    pushHistoryEntry({ id, url: info.linkUrl, ts: Date.now() });
+                    pushHistoryEntry({id, url: info.linkUrl, ts: Date.now()});
 
                     // 记录为最近任务 id/url 便于 options 页面恢复
-                    chrome.storage.local.set({ 'gd_last_id': id, 'gd_last_url': info.linkUrl });
+                    chrome.storage.local.set({'gd_last_id': id, 'gd_last_url': info.linkUrl});
 
                     // 打开 SSE（并转发进度）
                     openProgressSSE(id);

@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 )
 
 // DownloadHandler 处理文件下载请求
@@ -58,14 +59,58 @@ func ProgressSSE(c *gin.Context, hub *progress.Hub) {
 	ch := hub.Subscribe(id)
 	defer hub.Unsubscribe(id, ch)
 
+	// SSE headers
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
-	for prog := range ch {
-		// 发送一条事件，data 就是 0~100 的数字
-		fmt.Fprintf(c.Writer, "data: %d\n\n", prog)
-		c.Writer.Flush()
-		if prog >= 100 {
-			break
+	c.Writer.Header().Set("Connection", "keep-alive")
+
+	// 用 ticker 做节流，间隔 50ms
+	const interval = 50 * time.Millisecond
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	// 缓存最近接收到但还未发送的进度
+	lastProg := -1
+	pending := false
+
+	ctx := c.Request.Context()
+
+	// helper: 立即发送一次数据
+	send := func(p int) error {
+		_, err := fmt.Fprintf(c.Writer, "data: %d\n\n", p)
+		if err != nil {
+			return err
+		}
+		if f, ok := c.Writer.(http.Flusher); ok {
+			f.Flush()
+		}
+		return nil
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case prog, ok := <-ch:
+			if !ok {
+				// channel 关闭：如果有未发送的 pending，先发一次
+				if pending {
+					_ = send(lastProg)
+				}
+				return
+			}
+			// 收到新的进度，缓存起来（不立即发送，等待 ticker）
+			lastProg = prog
+			pending = true
+			if prog >= 100 {
+				_ = send(prog)
+				return
+			}
+		case <-ticker.C:
+			if pending {
+				_ = send(lastProg)
+				pending = false
+			}
 		}
 	}
 }

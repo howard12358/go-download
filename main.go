@@ -7,9 +7,9 @@ import (
 
 func main() {
 	r := web.SetupRouter()
-	addr := ":11235"
-	log.Printf("starting go-download server on %s…\n", addr)
-	if err := r.Run(addr); err != nil {
+	port := ":11235"
+	log.Printf("starting go-download server on %s...\n", port)
+	if err := r.Run(port); err != nil {
 		log.Fatalf("failed to run server: %v", err)
 	}
 }
