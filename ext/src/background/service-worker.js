@@ -49,16 +49,18 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
             .then(data => {
                 const {id, status} = data || {};
                 if (status === 'success' && id) {
+                    // 写入 history（唯一负责写 history 的位置）
+                    upsertHistoryEntry({id, url: info.linkUrl, ts: Date.now(), status: 'pending'});
                     // push history (recent first, cap 100)
-                    chrome.storage.local.get({history: []}, res => {
-                        const hist = res.history || [];
-                        hist.unshift({id, url: info.linkUrl, ts: Date.now(), status: 'pending'});
-                        if (hist.length > APP.HISTORY_MAX) hist.length = APP.HISTORY_MAX;
-                        chrome.storage.local.set({history: hist}, () => {
-                            // notify options/popup if open (安全发送)
-                            safeSendMessage({type: MSG.ADD_HISTORY, item: {id, url: info.linkUrl}});
-                        });
-                    });
+                    // chrome.storage.local.get({history: []}, res => {
+                    //     const hist = res.history || [];
+                    //     hist.unshift({id, url: info.linkUrl, ts: Date.now(), status: 'pending'});
+                    //     if (hist.length > APP.HISTORY_MAX) hist.length = APP.HISTORY_MAX;
+                    //     chrome.storage.local.set({history: hist}, () => {
+                    //         // notify options/popup if open (安全发送)
+                    //         safeSendMessage({type: MSG.ADD_HISTORY, item: {id, url: info.linkUrl}});
+                    //     });
+                    // });
 
                     openProgressSSE(id);
                 } else {
@@ -86,9 +88,6 @@ function openProgressSSE(id) {
 
             // 写当前进度到 storage（覆盖）
             chrome.storage.local.set({[STORAGE.PROGRESS_PREFIX + id]: percent});
-
-            // 如果不在 history 中则添加（防御）
-            safePushHistoryIfNotExist({id, url: null, ts: Date.now(), status: percent >= 100 ? 'done' : 'pending'});
 
             // 如果达到 100%，标记为完成（更新 history）
             if (percent >= 100) {
@@ -134,36 +133,6 @@ function openProgressSSE(id) {
             }
         };
 
-
-        // es.onmessage = e => {
-        //     const percent = Number(e.data) || 0;
-        //     chrome.storage.local.set({[STORAGE.PROGRESS_PREFIX + id]: percent});
-        //
-        //     // if not in history, add it (defensive)
-        //     safePushHistoryIfNotExist({id, url: null, ts: Date.now(), status: percent >= 100 ? 'done' : 'pending'});
-        //
-        //     if (percent >= 100) markHistoryDone(id);
-        //
-        //     // throttle forward: min interval 10ms OR percent difference >=1
-        //     const now = Date.now();
-        //     const prev = lastForward.get(id) || {time: 0, percent: -1};
-        //     if (now - prev.time < 10 && Math.abs(percent - prev.percent) < 1) {
-        //         return;
-        //     }
-        //     lastForward.set(id, {time: now, percent});
-        //
-        //     // use safeSendMessage to avoid "Receiving end does not exist" warnings
-        //     safeSendMessage({type: MSG.DOWNLOAD_PROGRESS, id, percent});
-        //
-        //     if (percent >= 100) {
-        //         try {
-        //             es.close();
-        //         } catch (e) {
-        //         }
-        //         sseMap.delete(id);
-        //     }
-        // };
-
         es.onerror = err => {
             console.warn('SSE error for', id, err);
             try {
@@ -181,23 +150,6 @@ function openProgressSSE(id) {
     }
 }
 
-function safePushHistoryIfNotExist(entry) {
-    chrome.storage.local.get({history: []}, res => {
-        const hist = res.history || [];
-        const exists = hist.find(h => h.id === entry.id);
-        if (!exists) {
-            hist.unshift(entry);
-            if (hist.length > APP.HISTORY_MAX) hist.length = APP.HISTORY_MAX;
-            chrome.storage.local.set({history: hist});
-        } else if (entry.status) {
-            hist.forEach(h => {
-                if (h.id === entry.id) h.status = entry.status;
-            });
-            chrome.storage.local.set({history: hist});
-        }
-    });
-}
-
 function markHistoryDone(id) {
     chrome.storage.local.get({history: []}, res => {
         const hist = res.history || [];
@@ -210,6 +162,40 @@ function markHistoryDone(id) {
             }
         }
         if (changed) chrome.storage.local.set({history: hist});
+    });
+}
+
+function upsertHistoryEntry(entry) {
+    // entry 结构： { id, url?, ts?, status? }
+    chrome.storage.local.get({history: []}, res => {
+        const hist = res.history || [];
+        const idx = hist.findIndex(h => h.id === entry.id);
+
+        if (idx === -1) {
+            // not exist -> push to head
+            const e = {
+                id: entry.id,
+                url: entry.url || null,
+                ts: entry.ts || Date.now(),
+                status: entry.status || 'pending'
+            };
+            hist.unshift(e);
+        } else {
+            // exist -> merge fields (do NOT clobber good data with null/undefined)
+            const cur = hist[idx];
+            if (!cur.url && entry.url) cur.url = entry.url;
+            // prefer more recent ts if provided
+            if (entry.ts && (!cur.ts || entry.ts > cur.ts)) cur.ts = entry.ts;
+            if (entry.status) cur.status = entry.status;
+        }
+
+        // cap length
+        if (hist.length > APP.HISTORY_MAX) hist.length = APP.HISTORY_MAX;
+
+        chrome.storage.local.set({history: hist}, () => {
+            // notify UI if needed (safe)
+            safeSendMessage({type: MSG.ADD_HISTORY, item: {id: entry.id, url: entry.url || null}});
+        });
     });
 }
 

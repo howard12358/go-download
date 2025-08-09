@@ -18,7 +18,7 @@ export const STORAGE = {
 
 // app level 配置
 export const APP = {
-    HISTORY_MAX: 15,
+    HISTORY_MAX: 100,
     PROGRESS_THROTTLE_MS: 100, // 写 storage 的节流阈值（ms）
 } as const;
 

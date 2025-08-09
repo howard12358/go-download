@@ -58,14 +58,18 @@
 </template>
 
 <script setup lang="ts">
-import {onMounted, reactive, ref} from 'vue'
+import {onMounted, reactive, ref, toRefs} from 'vue'
 import {BASE_URL, MSG, STORAGE} from "../common/constants";
 
 const history = ref<Array<any>>([])
 const progress = reactive<Record<string, number>>({})
-const downloadPath = ref('')
-const proxyUrl = ref('')
-const statusTextLine = ref('')
+
+const settings = reactive({
+  downloadPath: '',
+  proxyUrl: '',
+  statusTextLine: ''
+})
+const {downloadPath, proxyUrl, statusTextLine} = toRefs(settings)
 
 function loadSettings() {
   chrome.storage.sync.get({downloadPath: '', proxyUrl: ''}, prefs => {
