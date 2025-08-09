@@ -8,6 +8,7 @@ import (
 	"go-download/internal/common"
 	"go-download/internal/pget"
 	"go-download/internal/progress"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -53,6 +54,8 @@ func DownloadHandler(c *gin.Context, hub *progress.Hub) {
 	})
 }
 
+const interval = 50 * time.Millisecond
+
 // ProgressSSE 新增一个 /progress/:id SSE endpoint
 func ProgressSSE(c *gin.Context, hub *progress.Hub) {
 	id := c.Param("id")
@@ -65,7 +68,6 @@ func ProgressSSE(c *gin.Context, hub *progress.Hub) {
 	c.Writer.Header().Set("Connection", "keep-alive")
 
 	// 用 ticker 做节流，间隔 50ms
-	const interval = 50 * time.Millisecond
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -76,15 +78,15 @@ func ProgressSSE(c *gin.Context, hub *progress.Hub) {
 	ctx := c.Request.Context()
 
 	// helper: 立即发送一次数据
-	send := func(p int) error {
+	send := func(p int) {
 		_, err := fmt.Fprintf(c.Writer, "data: %d\n\n", p)
 		if err != nil {
-			return err
+			log.Println("send progress failed:", err)
+			return
 		}
 		if f, ok := c.Writer.(http.Flusher); ok {
 			f.Flush()
 		}
-		return nil
 	}
 
 	for {
@@ -95,7 +97,7 @@ func ProgressSSE(c *gin.Context, hub *progress.Hub) {
 			if !ok {
 				// channel 关闭：如果有未发送的 pending，先发一次
 				if pending {
-					_ = send(lastProg)
+					send(lastProg)
 				}
 				return
 			}
@@ -103,12 +105,13 @@ func ProgressSSE(c *gin.Context, hub *progress.Hub) {
 			lastProg = prog
 			pending = true
 			if prog >= 100 {
-				_ = send(prog)
+				send(prog)
 				return
 			}
 		case <-ticker.C:
+			// 周期性发送最新的进度（把高频合并成低频）
 			if pending {
-				_ = send(lastProg)
+				send(lastProg)
 				pending = false
 			}
 		}

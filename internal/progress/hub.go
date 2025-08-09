@@ -4,6 +4,10 @@ import (
 	"sync"
 )
 
+const (
+	cacheSize = 16
+)
+
 // Hub 管理多个任务的订阅者
 type Hub struct {
 	mu   sync.Mutex
@@ -26,7 +30,7 @@ func (h *Hub) NewTask(id string) {
 
 // Subscribe 为指定任务注册一个进度通道
 func (h *Hub) Subscribe(id string) chan int {
-	ch := make(chan int, 1) // 带缓冲，防止阻塞发布
+	ch := make(chan int, cacheSize) // 带缓冲，防止阻塞发布
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if _, ok := h.subs[id]; !ok {

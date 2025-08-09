@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"golang.org/x/sync/errgroup"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -291,7 +292,7 @@ func (t *task) downloadWithProgress(
 }
 
 func bindFiles(c *DownloadConfig, partialDir string) error {
-	fmt.Fprintln(stdout, c.Filename, " start binding files")
+	log.Println("start bind files, target file:", c.Dirname+c.Filename)
 
 	destPath := filepath.Join(c.Dirname, c.Filename)
 	f, err := os.Create(destPath)
