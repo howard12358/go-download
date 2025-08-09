@@ -51,4 +51,5 @@ yarn-error.log
 .DS_Store
 build/bin
 .vscode
+package-lock.json
 # End of https://www.toptal.com/developers/gitignore/api/go,goland

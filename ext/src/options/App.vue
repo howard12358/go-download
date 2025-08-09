@@ -59,14 +59,13 @@
 
 <script setup lang="ts">
 import {onMounted, reactive, ref} from 'vue'
+import {BASE_URL, MSG, STORAGE} from "../common/constants";
 
 const history = ref<Array<any>>([])
 const progress = reactive<Record<string, number>>({})
 const downloadPath = ref('')
 const proxyUrl = ref('')
 const statusTextLine = ref('')
-
-const baseUrl = 'http://127.0.0.1:11235'
 
 function loadSettings() {
   chrome.storage.sync.get({downloadPath: '', proxyUrl: ''}, prefs => {
@@ -89,7 +88,7 @@ function saveSettings() {
 }
 
 function chooseDir() {
-  fetch(`${baseUrl}/gd/choose-dir`)
+  fetch(`${BASE_URL}/gd/choose-dir`)
       .then(r => r.json())
       .then(d => {
         if (d.path) downloadPath.value = d.path
@@ -101,7 +100,7 @@ function openSSE(item: any) {
   if (!item || !item.id) return;
 
   // ask background to open SSE (background will ensure only one per id)
-  chrome.runtime.sendMessage({type: 'START_PROGRESS_SSE', id: item.id}, resp => {
+  chrome.runtime.sendMessage({type: MSG.START_PROGRESS_SSE, id: item.id}, resp => {
     if (chrome.runtime.lastError) {
       // 后台可能无响应（被终止），静默忽略或记录
       console.debug('no bg response (ignored):', chrome.runtime.lastError.message);
@@ -112,8 +111,8 @@ function openSSE(item: any) {
   });
 
   // 读已持久化的进度并显示
-  chrome.storage.local.get(['gd_progress_' + item.id], r => {
-    const pct = r['gd_progress_' + item.id];
+  chrome.storage.local.get([STORAGE.PROGRESS_PREFIX + item.id], r => {
+    const pct = r[STORAGE.PROGRESS_PREFIX + item.id];
     if (typeof pct === 'number') progress[item.id] = pct;
   });
 }
@@ -141,7 +140,7 @@ function removeHistoryItem(id: string) {
   chrome.storage.local.get({history: []}, res => {
     const hist = (res.history || []).filter((h: any) => h.id !== id)
     chrome.storage.local.set({history: hist}, () => {
-      chrome.storage.local.remove('gd_progress_' + id)
+      chrome.storage.local.remove(STORAGE.PROGRESS_PREFIX + id)
       loadHistory()
     })
   })
@@ -159,9 +158,9 @@ onMounted(() => {
 
   chrome.runtime.onMessage.addListener((msg) => {
     if (!msg) return
-    if (msg.type === 'DOWNLOAD_PROGRESS') {
+    if (msg.type === MSG.DOWNLOAD_PROGRESS) {
       updateItemProgress(msg.id, msg.percent)
-    } else if (msg.type === 'ADD_HISTORY') {
+    } else if (msg.type === MSG.ADD_HISTORY) {
       // background might push this when starting a new download
       loadHistory()
     }

@@ -1,4 +1,6 @@
 // src/background/service-worker.js
+import {APP, MSG, PROGRESS_CLEANUP_DELAY_MS, STORAGE} from "../common/constants";
+
 const SERVER_BASE = 'http://127.0.0.1:11235/gd';
 const sseMap = new Map(); // id -> EventSource
 const lastForward = new Map(); // id -> {time, percent}
@@ -51,10 +53,10 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
                     chrome.storage.local.get({history: []}, res => {
                         const hist = res.history || [];
                         hist.unshift({id, url: info.linkUrl, ts: Date.now(), status: 'pending'});
-                        if (hist.length > 100) hist.length = 100;
+                        if (hist.length > APP.HISTORY_MAX) hist.length = APP.HISTORY_MAX;
                         chrome.storage.local.set({history: hist}, () => {
                             // notify options/popup if open (安全发送)
-                            safeSendMessage({type: 'ADD_HISTORY', item: {id, url: info.linkUrl}});
+                            safeSendMessage({type: MSG.ADD_HISTORY, item: {id, url: info.linkUrl}});
                         });
                     });
 
@@ -79,34 +81,88 @@ function openProgressSSE(id) {
         const es = new EventSource(url);
         sseMap.set(id, es);
 
-        es.onmessage = e => {
+        es.onmessage = (e) => {
             const percent = Number(e.data) || 0;
-            chrome.storage.local.set({['gd_progress_' + id]: percent});
 
-            // if not in history, add it (defensive)
+            // 写当前进度到 storage（覆盖）
+            chrome.storage.local.set({[STORAGE.PROGRESS_PREFIX + id]: percent});
+
+            // 如果不在 history 中则添加（防御）
             safePushHistoryIfNotExist({id, url: null, ts: Date.now(), status: percent >= 100 ? 'done' : 'pending'});
 
-            if (percent >= 100) markHistoryDone(id);
+            // 如果达到 100%，标记为完成（更新 history）
+            if (percent >= 100) {
+                markHistoryDone(id);
+            }
 
-            // throttle forward: min interval 10ms OR percent difference >=1
+            // 节流 / 合并：最小时间间隔或变化阈值
             const now = Date.now();
             const prev = lastForward.get(id) || {time: 0, percent: -1};
             if (now - prev.time < 10 && Math.abs(percent - prev.percent) < 1) {
+                // 已写 storage，但不再转发消息（节流）
                 return;
             }
             lastForward.set(id, {time: now, percent});
 
-            // use safeSendMessage to avoid "Receiving end does not exist" warnings
-            safeSendMessage({type: 'DOWNLOAD_PROGRESS', id, percent});
+            // 向打开的前端安全转发进度消息
+            safeSendMessage({type: MSG.DOWNLOAD_PROGRESS, id, percent});
 
+            // 当任务完成时：清理 SSE、本地内存，并在延迟后移除持久化进度
             if (percent >= 100) {
                 try {
                     es.close();
-                } catch (e) {
+                } catch (err) {
                 }
                 sseMap.delete(id);
+                lastForward.delete(id);
+
+                // 延迟移除 gd_progress_<id>，给前端留时间读取最后进度（可改为 0 立即删除）
+                const delay = typeof PROGRESS_CLEANUP_DELAY_MS !== 'undefined' ? PROGRESS_CLEANUP_DELAY_MS : 5000;
+                setTimeout(() => {
+                    try {
+                        chrome.storage.local.remove('gd_progress_' + id, () => {
+                            // 可选：检查 chrome.runtime.lastError
+                            if (chrome.runtime.lastError) {
+                                // 静默忽略
+                                // console.debug('remove gd_progress error', chrome.runtime.lastError.message);
+                            }
+                        });
+                    } catch (err) {
+                        // 防御性捕获
+                    }
+                }, delay);
             }
         };
+
+
+        // es.onmessage = e => {
+        //     const percent = Number(e.data) || 0;
+        //     chrome.storage.local.set({[STORAGE.PROGRESS_PREFIX + id]: percent});
+        //
+        //     // if not in history, add it (defensive)
+        //     safePushHistoryIfNotExist({id, url: null, ts: Date.now(), status: percent >= 100 ? 'done' : 'pending'});
+        //
+        //     if (percent >= 100) markHistoryDone(id);
+        //
+        //     // throttle forward: min interval 10ms OR percent difference >=1
+        //     const now = Date.now();
+        //     const prev = lastForward.get(id) || {time: 0, percent: -1};
+        //     if (now - prev.time < 10 && Math.abs(percent - prev.percent) < 1) {
+        //         return;
+        //     }
+        //     lastForward.set(id, {time: now, percent});
+        //
+        //     // use safeSendMessage to avoid "Receiving end does not exist" warnings
+        //     safeSendMessage({type: MSG.DOWNLOAD_PROGRESS, id, percent});
+        //
+        //     if (percent >= 100) {
+        //         try {
+        //             es.close();
+        //         } catch (e) {
+        //         }
+        //         sseMap.delete(id);
+        //     }
+        // };
 
         es.onerror = err => {
             console.warn('SSE error for', id, err);
@@ -131,7 +187,7 @@ function safePushHistoryIfNotExist(entry) {
         const exists = hist.find(h => h.id === entry.id);
         if (!exists) {
             hist.unshift(entry);
-            if (hist.length > 100) hist.length = 100;
+            if (hist.length > APP.HISTORY_MAX) hist.length = APP.HISTORY_MAX;
             chrome.storage.local.set({history: hist});
         } else if (entry.status) {
             hist.forEach(h => {
@@ -160,7 +216,7 @@ function markHistoryDone(id) {
 // handle messages from popup/options
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (!msg || !msg.type) return;
-    if (msg.type === 'START_PROGRESS_SSE' && msg.id) {
+    if (msg.type === MSG.START_PROGRESS_SSE && msg.id) {
         openProgressSSE(msg.id);
         // 立即给 caller 一个确认，避免 "message port closed" 的警告
         sendResponse({ok: true});
