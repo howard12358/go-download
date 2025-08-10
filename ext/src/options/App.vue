@@ -1,32 +1,42 @@
 <template>
-  <div>
+  <div class="options-root">
     <details open>
       <summary>下载历史</summary>
       <div class="panel">
         <ul class="history-list">
           <li v-if="history.length === 0">暂无下载历史</li>
           <li v-for="item in history" :key="item.id">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-              <div style="flex:1">
-                <a href="#" @click.prevent="openSSE(item)" style="text-decoration:none;color:#222;font-size:13px">
-                  {{ item.url || '(no url)' }}
-                </a>
+            <!-- 第一行：仅 URL -->
+            <div class="history-link-row">
+              <a href="#"
+                 :title="item.url || '(no url)'"
+                 class="history-link">
+                {{ ellipsisMiddle(item.url) }}
+              </a>
+            </div>
+
+            <!-- 第二行：时间（左）  状态+移除（右） -->
+            <div class="history-actions-row">
+              <div class="time-left">
                 <div class="history-meta">{{ item.ts ? new Date(item.ts).toLocaleString() : '' }}</div>
               </div>
-              <div style="display:flex;align-items:center;gap:8px">
-                <span :id="`status-${item.id}`" class="status-badge"
-                      :class="item.status === 'done' ? 'status-done' : 'status-pending'">
+
+              <div class="actions-right">
+                <span :id="`status-${item.id}`"
+                      :class="['status-badge', item.status === 'done' ? 'status-done' : 'status-pending']">
                   {{ item.status === 'done' ? '已完成' : statusText(item.id, item.status) }}
                 </span>
                 <button class="btn btn-remove" @click="removeHistoryItem(item.id)">移除</button>
               </div>
             </div>
 
+            <!-- 进度条 -->
             <div class="item-progress" v-if="item.status !== 'done'">
-              <div class="progress-bg">
-                <div class="progress-fill" :style="{ width: (progress[item.id] || 0) + '%' }">
-                  {{ progress[item.id] || 0 }}%
+              <div class="progress-row">
+                <div class="progress-bg">
+                  <div class="progress-fill" :style="{ width: (progress[item.id] || 0) + '%' }"></div>
                 </div>
+                <div class="progress-percent">{{ progress[item.id] || 0 }}%</div>
               </div>
             </div>
           </li>
@@ -155,6 +165,13 @@ function statusText(id: string, s: string) {
   const p = progress[id] || 0
   return p > 0 ? '下载中' : '等待中'
 }
+
+function ellipsisMiddle(url?: string) {
+  if (!url) return '(no url)';
+  if (url.length <= 35) return url;
+  return `${url.slice(0, 25)}…${url.slice(url.length - 10)}`;
+}
+
 
 onMounted(() => {
   loadSettings()
