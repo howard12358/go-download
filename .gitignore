@@ -52,4 +52,7 @@ yarn-error.log
 build/bin
 .vscode
 package-lock.json
+bin
+*.pkg
+*.pem
 # End of https://www.toptal.com/developers/gitignore/api/go,goland

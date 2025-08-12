@@ -26,6 +26,7 @@ func DownloadHandler(c *gin.Context, hub *progress.Hub) {
 		return
 	}
 	id := uuid.New().String()
+	log.Println("start download, id:", id)
 	// 2. 异步调用 pget
 	go func(url string) {
 		cli := pget.New()
@@ -59,6 +60,10 @@ const interval = 50 * time.Millisecond
 // ProgressSSE 新增一个 /progress/:id SSE endpoint
 func ProgressSSE(c *gin.Context, hub *progress.Hub) {
 	id := c.Param("id")
+	if _, ok := hub.Subs[id]; !ok {
+		c.JSON(201, gin.H{"msg": "task finished"})
+		return
+	}
 	ch := hub.Subscribe(id)
 	defer hub.Unsubscribe(id, ch)
 
@@ -99,6 +104,7 @@ func ProgressSSE(c *gin.Context, hub *progress.Hub) {
 				if pending {
 					send(lastProg)
 				}
+				log.Println("download finished, id:", id)
 				return
 			}
 			// 收到新的进度，缓存起来（不立即发送，等待 ticker）
@@ -106,6 +112,7 @@ func ProgressSSE(c *gin.Context, hub *progress.Hub) {
 			pending = true
 			if prog >= 100 {
 				send(prog)
+				log.Println("download finished, id:", id)
 				return
 			}
 		case <-ticker.C:

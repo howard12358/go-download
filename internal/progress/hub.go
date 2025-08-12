@@ -11,13 +11,13 @@ const (
 // Hub 管理多个任务的订阅者
 type Hub struct {
 	mu   sync.Mutex
-	subs map[string]map[chan int]struct{} // taskID → set of subscriber channels
+	Subs map[string]map[chan int]struct{} // taskID → set of subscriber channels
 }
 
 // NewHub 创建一个新的 Hub
 func NewHub() *Hub {
 	return &Hub{
-		subs: make(map[string]map[chan int]struct{}),
+		Subs: make(map[string]map[chan int]struct{}),
 	}
 }
 
@@ -25,7 +25,7 @@ func NewHub() *Hub {
 func (h *Hub) NewTask(id string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.subs[id] = make(map[chan int]struct{})
+	h.Subs[id] = make(map[chan int]struct{})
 }
 
 // Subscribe 为指定任务注册一个进度通道
@@ -33,10 +33,10 @@ func (h *Hub) Subscribe(id string) chan int {
 	ch := make(chan int, cacheSize) // 带缓冲，防止阻塞发布
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if _, ok := h.subs[id]; !ok {
-		h.subs[id] = make(map[chan int]struct{})
+	if _, ok := h.Subs[id]; !ok {
+		h.Subs[id] = make(map[chan int]struct{})
 	}
-	h.subs[id][ch] = struct{}{}
+	h.Subs[id][ch] = struct{}{}
 	return ch
 }
 
@@ -44,7 +44,7 @@ func (h *Hub) Subscribe(id string) chan int {
 func (h *Hub) Publish(id string, prog int) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	for ch := range h.subs[id] {
+	for ch := range h.Subs[id] {
 		select {
 		case ch <- prog:
 		default:
@@ -57,9 +57,9 @@ func (h *Hub) Publish(id string, prog int) {
 func (h *Hub) Unsubscribe(id string, ch chan int) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	delete(h.subs[id], ch)
+	delete(h.Subs[id], ch)
 	close(ch)
-	if len(h.subs[id]) == 0 {
-		delete(h.subs, id)
+	if len(h.Subs[id]) == 0 {
+		delete(h.Subs, id)
 	}
 }

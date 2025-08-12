@@ -1,11 +1,54 @@
 package main
 
 import (
+	_ "embed"
+	"github.com/getlantern/systray"
 	"go-download/internal/web"
 	"log"
 )
 
+// 把生成的 icon.icns 放到 resources 中并编译进二进制
+//
+//go:embed resources/icon.icns
+var iconData []byte
+
 func main() {
+	systray.Run(onReady, onExit)
+}
+
+func onReady() {
+	// 设置图标与提示
+	systray.SetIcon(iconData)
+	systray.SetTooltip("Go Download (运行中)")
+
+	// 菜单项（第一个只是状态不可点击也可以响应）
+	mStatus := systray.AddMenuItem("正在运行", "应用当前状态：正在运行")
+	_ = mStatus // 如果不需要交互可忽略
+
+	// 分隔线
+	systray.AddSeparator()
+
+	// 退出菜单
+	mQuit := systray.AddMenuItem("退出", "退出应用")
+
+	go startBackend()
+
+	// 监听菜单事件
+	go func() {
+		for {
+			select {
+			case <-mQuit.ClickedCh:
+				systray.Quit()
+				return
+			}
+		}
+	}()
+}
+
+func onExit() {
+}
+
+func startBackend() {
 	r := web.SetupRouter()
 	port := ":11235"
 	log.Printf("starting go-download server on %s...\n", port)

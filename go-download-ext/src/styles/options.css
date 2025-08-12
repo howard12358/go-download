@@ -1,0 +1,261 @@
+:root {
+    --bg: #ffffff;
+    --muted: #666;
+    --border: #e0e0e0;
+    --accent: #4caf50;
+    --accent-dark: #3a9a3a;
+    --danger: #e05a4e;
+    --success-bg: #e8f7ed;
+    --success-color: #0b7a3b;
+    --warn-bg: #fff7e6;
+    --warn-color: #8a6d00;
+}
+
+/* Reset / 基础 */
+* {
+    box-sizing: border-box
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial;
+    background: var(--bg);
+    color: #222
+}
+
+body {
+    width: 360px;
+    height: 480px; /* popup 尺寸 */
+    padding: 10px;
+    font-size: 13px;
+    overflow: hidden;
+}
+
+/* panels */
+details {
+    margin-bottom: 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden
+}
+
+summary {
+    display: block;
+    padding: 10px;
+    background: #f7f7f7;
+    cursor: pointer;
+    font-weight: 600
+}
+
+.panel {
+    padding: 10px
+}
+
+/* history 列表 */
+.history-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 360px;
+    overflow-y: auto
+}
+
+.history-list li {
+    padding: 8px 6px;
+    border-bottom: 1px dashed var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* 第一行：链接（单行截断，中间省略由 JS 提供） */
+.history-link-row {
+    display: block
+}
+
+.history-link {
+    display: block;
+    flex: 1 1 auto;
+    font-size: 13px;
+    color: #222;
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 第二行：左时间（time-left），右 actions（status + button） */
+.history-actions-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 6px;
+}
+
+.time-left {
+    flex: 1 1 auto
+}
+
+.history-meta {
+    font-size: 11px;
+    color: var(--muted);
+}
+
+/* actions 组（靠右） */
+.actions-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto
+}
+
+/* 状态徽章 */
+.status-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-size: 11px
+}
+
+.status-pending {
+    background: var(--warn-bg);
+    color: var(--warn-color)
+}
+
+.status-done {
+    background: var(--success-bg);
+    color: var(--success-color)
+}
+
+/* 按钮通用 */
+.btn {
+    border: 1px solid var(--border);
+    background: white;
+    padding: 4px 8px;
+    font-size: 12px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.btn-remove {
+    border-color: #f0d0d0;
+    color: var(--danger);
+    background: #fff7f7;
+    padding: 4px 8px;
+}
+
+/* 主要操作按钮 */
+.primary {
+    margin-top: 10px;
+    width: 100%;
+    padding: 8px;
+    border-radius: 6px;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* input / field */
+.field {
+    margin-top: 6px
+}
+
+.field label {
+    display: block;
+    font-size: 12px;
+    margin-bottom: 6px;
+    color: var(--muted)
+}
+
+.input-group {
+    display: flex;
+    align-items: center;
+    gap: 8px
+}
+
+.input-group input[type="text"] {
+    flex: 1;
+    padding: 8px;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+}
+
+.input-group button {
+    padding: 7px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: #fff;
+    cursor: pointer
+}
+
+/* 进度条 */
+/* 进度条数字固定在最右侧 */
+.item-progress {
+    margin-top: 8px;
+}
+
+.progress-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* 进度条本体占满剩余空间，百分比在右 */
+.progress-bg {
+    flex: 1 1 auto;
+    height: 8px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #efefef;
+    position: relative;
+}
+
+/* 填充部分 */
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-dark));
+    transition: width 200ms linear;
+}
+
+/* 固定在右侧的百分比文本 */
+.progress-percent {
+    width: 48px; /* 固定宽度，保证对齐 */
+    text-align: right;
+    font-size: 11px;
+    color: var(--muted);
+    flex: 0 0 auto;
+    user-select: none;
+}
+
+/* 保证在窄容器里不会把数字挤出视口 */
+@media (max-width: 380px) {
+    .progress-percent {
+        width: 44px;
+        font-size: 10px;
+    }
+}
+
+/* 小提示行 */
+.status-line {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--accent-dark);
+    text-align: center
+}
+
+/* 辅助：防止弹窗横向滚动 */
+.history-link, .input-group input[type="text"] {
+    max-width: 100%
+}
+
+/* 给容器上下留出内边距 */
+.options-root {
+    padding-top: 6px;
+    padding-bottom: 10px;
+    box-sizing: border-box;
+}
