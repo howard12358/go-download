@@ -55,4 +55,5 @@ package-lock.json
 bin
 *.pkg
 *.pem
+*.dmg
 # End of https://www.toptal.com/developers/gitignore/api/go,goland
