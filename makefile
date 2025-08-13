@@ -52,7 +52,7 @@ mac_dmg_build:
 	@cp -r $(BIN_DIR)/universal/GoDownload build/mac/GoDownload.app/Contents/MacOS/
 	@cd build/mac && create-dmg \
       --volname "GoDownload" \
-      --background "dmg.png" \
+      --background "background.png" \
       --window-pos 400 200 \
       --window-size 660 400 \
       --icon-size 100 \

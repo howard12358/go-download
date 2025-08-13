@@ -9,7 +9,7 @@ import (
 
 // 把生成的 icon.icns 放到 resources 中并编译进二进制
 //
-//go:embed resources/icon.icns
+//go:embed build/resources/icon.icns
 var iconData []byte
 
 func main() {
