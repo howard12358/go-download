@@ -18,6 +18,7 @@ require (
 )
 
 require (
+	github.com/TheTitanrain/w32 v0.0.0-20180517000239-4f5cfb03fabf // indirect
 	github.com/VividCortex/ewma v1.1.1 // indirect
 	github.com/antonholmquist/jason v1.0.1-0.20160829104012-962e09b85496 // indirect
 	github.com/bytedance/sonic v1.11.6 // indirect
@@ -57,6 +58,7 @@ require (
 	github.com/pierrec/lz4 v2.5.2+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
+	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/ulikunitz/xz v0.5.8 // indirect

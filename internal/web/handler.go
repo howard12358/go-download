@@ -5,15 +5,13 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/sqweek/dialog"
 	"go-download/internal/common"
 	"go-download/internal/pget"
 	"go-download/internal/progress"
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
-	"runtime"
-	"strings"
 	"time"
 )
 
@@ -127,32 +125,10 @@ func ProgressSSE(c *gin.Context, hub *progress.Hub) {
 
 // ChooseDirHandler 处理选择下载目录请求
 func ChooseDirHandler(c *gin.Context) {
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "darwin":
-		// macOS 用 AppleScript
-		cmd = exec.Command("osascript", "-e",
-			`POSIX path of (choose folder with prompt "请选择下载目录")`)
-	case "linux":
-		// Linux 需安装 zenity
-		cmd = exec.Command("zenity", "--file-selection", "--directory", "--title=请选择下载目录")
-	case "windows":
-		// Windows 用 PowerShell
-		// 你可能需要改成一个更完整的 PowerShell 脚本
-		script := `Add-Type -AssemblyName System.Windows.Forms;` +
-			`$f = New-Object System.Windows.Forms.FolderBrowserDialog;` +
-			`if($f.ShowDialog() -eq "OK"){ Write-Output $f.SelectedPath }`
-		cmd = exec.Command("powershell", "-NoProfile", "-Command", script)
-	default:
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "unsupported platform"})
-		return
-	}
-
-	out, err := cmd.Output()
+	path, err := dialog.Directory().Title("请选择下载目录").Browse()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	path := strings.TrimSpace(string(out))
 	c.JSON(http.StatusOK, gin.H{"path": path})
 }
