@@ -56,4 +56,5 @@ bin
 *.pkg
 *.pem
 *.dmg
+dist.zip
 # End of https://www.toptal.com/developers/gitignore/api/go,goland
