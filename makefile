@@ -46,7 +46,8 @@ universal: mac_amd64 mac_arm64
 # 只编译Windows amd64
 win_amd64:
 	@mkdir -p $(BIN_DIR)/windows_amd64
-	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o $(BIN_DIR)/windows_amd64/$(APP_NAME).exe $(MAIN_FILE)
+	@go clean
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -H=windowsgui" -o $(BIN_DIR)/windows_amd64/$(APP_NAME).exe $(MAIN_FILE)
 
 mac_dmg_build:
 	@cp -r $(BIN_DIR)/universal/GoDownload build/mac/GoDownload.app/Contents/MacOS/

@@ -5,12 +5,16 @@ import (
 	"github.com/getlantern/systray"
 	"go-download/internal/web"
 	"log"
+	"runtime"
 )
 
 // 把生成的 icon.icns 放到 resources 中并编译进二进制
 //
 //go:embed build/resources/icon.icns
-var iconData []byte
+var darwinIcon []byte
+
+//go:embed build/resources/icon.ico
+var windowsIcon []byte
 
 func main() {
 	systray.Run(onReady, onExit)
@@ -18,7 +22,12 @@ func main() {
 
 func onReady() {
 	// 设置图标与提示
-	systray.SetIcon(iconData)
+	if runtime.GOOS == "windows" {
+		systray.SetIcon(windowsIcon)
+	} else if runtime.GOOS == "darwin" {
+		systray.SetIcon(darwinIcon)
+	}
+
 	systray.SetTooltip("Go Download (运行中)")
 
 	// 菜单项（第一个只是状态不可点击也可以响应）
