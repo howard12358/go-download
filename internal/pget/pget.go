@@ -15,6 +15,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+type ProgressFunc func(downloaded, total, speed int64)
+
 // Pget structs
 type Pget struct {
 	Trace  bool
@@ -28,7 +30,7 @@ type Pget struct {
 	useragent string
 	referer   string
 
-	ProgressFn func(downloaded, total int64)
+	ProgressFn ProgressFunc
 }
 
 // New for pget package

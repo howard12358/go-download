@@ -18,7 +18,13 @@
             <!-- 第二行：时间（左）  状态+移除（右） -->
             <div class="history-actions-row">
               <div class="time-left">
-                <div class="history-meta">{{ item.ts ? new Date(item.ts).toLocaleString() : '' }}</div>
+                <div class="history-meta">
+                  {{ item.ts ? new Date(item.ts).toLocaleString() : '' }}
+                  <span class="speed-text"
+                        v-if="item.status !== 'done' && (speeds[item.id] || 0) > 0">
+                    · {{ formatSpeed(speeds[item.id] || 0) }}
+                  </span>
+                </div>
               </div>
 
               <div class="actions-right">
@@ -73,6 +79,7 @@ import {BASE_URL, MSG, STORAGE} from "../common/constants";
 
 const history = ref<Array<any>>([])
 const progress = reactive<Record<string, number>>({})
+const speeds = reactive<Record<string, number>>({})
 
 const settings = reactive({
   downloadPath: '',
@@ -120,20 +127,22 @@ function openSSE(item: any) {
       console.debug('no bg response (ignored):', chrome.runtime.lastError.message);
       return;
     }
-    // 可选：检查后台返回值
-    // if (resp && resp.ok) { ... }
   });
 
   // 读已持久化的进度并显示
-  chrome.storage.local.get([STORAGE.PROGRESS_PREFIX + item.id], r => {
-    const pct = r[STORAGE.PROGRESS_PREFIX + item.id];
+  chrome.storage.local.get([STORAGE.PERCENT_PREFIX + item.id], r => {
+    const pct = r[STORAGE.PERCENT_PREFIX + item.id];
     if (typeof pct === 'number') progress[item.id] = pct;
   });
 }
 
-function updateItemProgress(id: string, percent: number) {
+function updateItemProgress(id: string, percent?: number, speed?: number) {
   progress[id] = Math.max(0, Math.min(100, Math.round(percent)))
+  speeds[id] = Math.max(0, Math.floor(Number(speed) || 0))
   if (percent >= 100) {
+    // 清理速度显示（下载完成时隐藏）
+    speeds[id] = 0
+
     // refresh history status marker
     chrome.storage.local.get({history: []}, res => {
       const hist = res.history || []
@@ -154,7 +163,11 @@ function removeHistoryItem(id: string) {
   chrome.storage.local.get({history: []}, res => {
     const hist = (res.history || []).filter((h: any) => h.id !== id)
     chrome.storage.local.set({history: hist}, () => {
-      chrome.storage.local.remove(STORAGE.PROGRESS_PREFIX + id)
+      // 移除进度和速度的本地存储
+      chrome.storage.local.remove(STORAGE.PERCENT_PREFIX + id)
+      chrome.storage.local.remove(STORAGE.SPEED_PREFIX + id)
+      delete progress[id]
+      delete speeds[id]
       loadHistory()
     })
   })
@@ -172,6 +185,19 @@ function ellipsisMiddle(url?: string) {
   return `${url.slice(0, 25)}…${url.slice(url.length - 10)}`;
 }
 
+// 格式化 speed（bytes/sec）到可读字符串
+function formatSpeed(bytesPerSec?: number) {
+  const v = Number(bytesPerSec || 0)
+  if (v <= 0) return '0 B/s'
+  const KB = 1024
+  const MB = KB * 1024
+  const GB = MB * 1024
+
+  if (v < KB) return `${v} B/s`
+  if (v < MB) return `${(v / KB).toFixed(1).replace(/\.0$/, '')} KB/s`
+  if (v < GB) return `${(v / MB).toFixed(1).replace(/\.0$/, '')} MB/s`
+  return `${(v / GB).toFixed(2).replace(/\.00$/, '')} GB/s`
+}
 
 onMounted(() => {
   loadSettings()
@@ -180,7 +206,13 @@ onMounted(() => {
   chrome.runtime.onMessage.addListener((msg) => {
     if (!msg) return
     if (msg.type === MSG.DOWNLOAD_PROGRESS) {
-      updateItemProgress(msg.id, msg.percent)
+      // msg may carry { id, percent, speed }
+      if (typeof msg.percent !== 'undefined') {
+        updateItemProgress(msg.id, msg.percent, msg.speed)
+      }
+      // if (typeof msg.speed !== 'undefined') {
+      //   updateItemSpeed(msg.id, msg.speed)
+      // }
     } else if (msg.type === MSG.ADD_HISTORY) {
       // background might push this when starting a new download
       loadHistory()
@@ -188,12 +220,3 @@ onMounted(() => {
   })
 })
 </script>
-
-<style scoped>
-/* minimal scoped tweaks; main css is in src/styles/options.css */
-.history-meta {
-  font-size: 11px;
-  color: #666;
-  margin-top: 4px
-}
-</style>

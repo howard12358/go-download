@@ -13,7 +13,8 @@ export type MsgType = typeof MSG[keyof typeof MSG];
 // storage key 命名（建议统一前缀 gd_）
 export const STORAGE = {
     HISTORY: 'history',
-    PROGRESS_PREFIX: 'gd_progress_', // 用：STORAGE.PROGRESS_PREFIX + id
+    PERCENT_PREFIX: 'percent_', // 用：STORAGE.PERCENT_PREFIX + id
+    SPEED_PREFIX: 'speed_', // 用：STORAGE.SPEED_PREFIX + id
 } as const;
 
 // app level 配置

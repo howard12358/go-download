@@ -84,10 +84,13 @@ function openProgressSSE(id) {
         sseMap.set(id, es);
 
         es.onmessage = (e) => {
-            const percent = Number(e.data) || 0;
+            const data = JSON.parse(e.data);
+            const percent = data.percent || 0;
+            const speed = data.speed || 0;
 
             // 写当前进度到 storage（覆盖）
-            chrome.storage.local.set({[STORAGE.PROGRESS_PREFIX + id]: percent});
+            chrome.storage.local.set({[STORAGE.PERCENT_PREFIX + id]: percent});
+            chrome.storage.local.set({[STORAGE.SPEED_PREFIX + id]: speed});
 
             // 如果达到 100%，标记为完成（更新 history）
             if (percent >= 100) {
@@ -104,7 +107,7 @@ function openProgressSSE(id) {
             lastForward.set(id, {time: now, percent});
 
             // 向打开的前端安全转发进度消息
-            safeSendMessage({type: MSG.DOWNLOAD_PROGRESS, id, percent});
+            safeSendMessage({type: MSG.DOWNLOAD_PROGRESS, id, percent, speed});
 
             // 当任务完成时：清理 SSE、本地内存，并在延迟后移除持久化进度
             if (percent >= 100) {
@@ -119,11 +122,15 @@ function openProgressSSE(id) {
                 const delay = typeof PROGRESS_CLEANUP_DELAY_MS !== 'undefined' ? PROGRESS_CLEANUP_DELAY_MS : 5000;
                 setTimeout(() => {
                     try {
-                        chrome.storage.local.remove('gd_progress_' + id, () => {
+                        chrome.storage.local.remove(STORAGE.PERCENT_PREFIX + id, () => {
                             // 可选：检查 chrome.runtime.lastError
                             if (chrome.runtime.lastError) {
                                 // 静默忽略
                                 // console.debug('remove gd_progress error', chrome.runtime.lastError.message);
+                            }
+                        });
+                        chrome.storage.local.remove(STORAGE.SPEED_PREFIX + id, () => {
+                            if (chrome.runtime.lastError) {
                             }
                         });
                     } catch (err) {

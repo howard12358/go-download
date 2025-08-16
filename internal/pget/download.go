@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"golang.org/x/sync/errgroup"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"sync/atomic"
+	"time"
 
-	"github.com/cheggaaa/pb/v3"
 	"github.com/pkg/errors"
 )
 
@@ -121,13 +122,13 @@ type DownloadConfig struct {
 
 	*makeRequestOption
 
-	ProgressFn func(downloaded, total int64)
+	ProgressFn ProgressFunc
 }
 
 type DownloadOption func(c *DownloadConfig)
 
 // WithProgressCallback 把进度回调注入到 Pget
-func WithProgressCallback(fn func(downloaded, total int64)) DownloadOption {
+func WithProgressCallback(fn ProgressFunc) DownloadOption {
 	return func(c *DownloadConfig) {
 		c.ProgressFn = fn
 	}
@@ -179,6 +180,7 @@ func Download(ctx context.Context, c *DownloadConfig, opts ...DownloadOption) er
 		makeRequestOption: c.makeRequestOption,
 		DownloadConfig:    c,
 	}); err != nil {
+		log.Println("parallelDownload failed", err)
 		return err
 	}
 
@@ -197,19 +199,47 @@ type parallelDownloadConfig struct {
 func parallelDownload(ctx context.Context, c *parallelDownloadConfig) error {
 	eg, ctx := errgroup.WithContext(ctx)
 
-	//bar := pb.Start64(c.ContentLength).SetWriter(stdout).Set(pb.Bytes, true)
-	//defer bar.Finish()
-
 	// check file size already downloaded for resume
 	_, err := checkProgress(c.PartialDir)
 	if err != nil {
 		return errors.Wrap(err, "failed to get directory size")
 	}
 
-	//bar.SetCurrent(size)
-
 	// 全局累计已下载字节
 	var downloaded int64
+
+	// 启动采样器，定时计算下载速度
+	sampleInterval := 2 * time.Second
+	if c.DownloadConfig != nil && c.DownloadConfig.ProgressFn != nil {
+		// 使用一个 goroutine 周期性计算 delta / 秒上报 speed
+		eg.Go(func() error {
+			ticker := time.NewTicker(sampleInterval)
+			defer ticker.Stop()
+			last := int64(0)
+			lastTime := time.Now()
+			for {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case t := <-ticker.C:
+					cur := atomic.LoadInt64(&downloaded)
+					delta := cur - last
+					elapsed := t.Sub(lastTime).Seconds()
+					speed := int64(0)
+					if delta > 0 && elapsed > 0 {
+						speed = int64(float64(delta) / elapsed)
+					}
+					c.DownloadConfig.ProgressFn(cur, c.ContentLength, speed)
+					// 如果已经完成，退出采样器
+					if c.ContentLength > 0 && cur >= c.ContentLength {
+						return nil
+					}
+					last = cur
+					lastTime = t
+				}
+			}
+		})
+	}
 
 	for _, task := range c.Tasks {
 		task := task
@@ -218,42 +248,26 @@ func parallelDownload(ctx context.Context, c *parallelDownloadConfig) error {
 			if err != nil {
 				return err
 			}
-			//return task.download(req, nil)
 			return task.downloadWithProgress(req, &downloaded, c.ContentLength, c.DownloadConfig.ProgressFn)
 		})
 	}
 
-	return eg.Wait()
-}
+	err = eg.Wait()
 
-func (t *task) download(req *http.Request, bar *pb.ProgressBar) error {
-	resp, err := t.Client.Do(req)
-	if err != nil {
-		return errors.Wrapf(err, "failed to get response: %q", t.String())
-	}
-	defer resp.Body.Close()
-
-	output, err := os.OpenFile(t.destPath(), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		return errors.Wrapf(err, "failed to create: %q", t.String())
-	}
-	defer output.Close()
-
-	//rd := bar.NewProxyReader(resp.Body)
-
-	//if _, err := io.Copy(output, rd); err != nil {
-	if _, err := io.Copy(output, resp.Body); err != nil {
-		return errors.Wrapf(err, "failed to write response body: %q", t.String())
+	// 最后确保上报 100% 且 speed=0
+	if c.DownloadConfig != nil && c.DownloadConfig.ProgressFn != nil {
+		cur := atomic.LoadInt64(&downloaded)
+		c.DownloadConfig.ProgressFn(cur, c.ContentLength, 0)
 	}
 
-	return nil
+	return err
 }
 
 func (t *task) downloadWithProgress(
 	req *http.Request,
 	downloaded *int64,
 	total int64,
-	progressFn func(downloaded int64, total int64),
+	progressFn ProgressFunc,
 ) error {
 	resp, err := t.Client.Do(req)
 	if err != nil {
@@ -277,7 +291,8 @@ func (t *task) downloadWithProgress(
 			// 原子累加，并触发回调
 			newTotal := atomic.AddInt64(downloaded, int64(n))
 			if progressFn != nil {
-				progressFn(newTotal, total)
+				// 只上报下载进度，不上报速度
+				progressFn(newTotal, total, -1)
 			}
 		}
 		if readErr == io.EOF {
@@ -289,6 +304,57 @@ func (t *task) downloadWithProgress(
 	}
 	return nil
 }
+
+//func parallelDownload(ctx context.Context, c *parallelDownloadConfig) error {
+//	eg, ctx := errgroup.WithContext(ctx)
+//
+//	bar := pb.Start64(c.ContentLength).SetWriter(stdout).Set(pb.Bytes, true)
+//	defer bar.Finish()
+//
+//	// check file size already downloaded for resume
+//	size, err := checkProgress(c.PartialDir)
+//	if err != nil {
+//		return errors.Wrap(err, "failed to get directory size")
+//	}
+//
+//	bar.SetCurrent(size)
+//
+//	for _, task := range c.Tasks {
+//		task := task
+//		eg.Go(func() error {
+//			req, err := task.makeRequest(ctx, c.makeRequestOption)
+//			if err != nil {
+//				return err
+//			}
+//			return task.download(req, bar)
+//		})
+//	}
+//
+//	return eg.Wait()
+//}
+
+//func (t *task) download(req *http.Request, bar *pb.ProgressBar) error {
+//	resp, err := t.Client.Do(req)
+//	if err != nil {
+//		return errors.Wrapf(err, "failed to get response: %q", t.String())
+//	}
+//	defer resp.Body.Close()
+//
+//	output, err := os.OpenFile(t.destPath(), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+//	if err != nil {
+//		return errors.Wrapf(err, "failed to create: %q", t.String())
+//	}
+//	defer output.Close()
+//
+//	//rd := bar.NewProxyReader(resp.Body)
+//
+//	//if _, err := io.Copy(output, rd); err != nil {
+//	if _, err := io.Copy(output, resp.Body); err != nil {
+//		return errors.Wrapf(err, "failed to write response body: %q", t.String())
+//	}
+//
+//	return nil
+//}
 
 func bindFiles(c *DownloadConfig, partialDir string) error {
 	//log.Println("start bind files, target file:", c.Dirname+c.Filename)

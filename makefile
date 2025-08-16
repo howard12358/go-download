@@ -51,6 +51,7 @@ win_amd64:
 
 mac_dmg_build:
 	@cp -r $(BIN_DIR)/universal/GoDownload build/mac/GoDownload.app/Contents/MacOS/
+	@rm -rf build/mac/GoDownload.dmg
 	@cd build/mac && create-dmg \
       --volname "GoDownload" \
       --background "background.png" \

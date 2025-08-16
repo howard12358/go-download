@@ -3,7 +3,7 @@ package main
 import (
 	_ "embed"
 	"github.com/getlantern/systray"
-	"go-download/internal/web"
+	"go-download/internal/route"
 	"log"
 	"runtime"
 )
@@ -58,7 +58,7 @@ func onExit() {
 }
 
 func startBackend() {
-	r := web.SetupRouter()
+	r := route.SetupRouter()
 	port := ":11235"
 	log.Printf("starting go-download server on %s...\n", port)
 	if err := r.Run(port); err != nil {
