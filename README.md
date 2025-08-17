@@ -18,7 +18,7 @@
 
 进入 [releases](https://github.com/howard12358/go-download/releases) 页面：
 
-- chrome 扩展安装：下载 `dist.zip` 文件，解压后将 dist 目录拖拽进 `chrome://extensions/` 页面（前提是打开 “开发者模式”）
+- chrome 扩展安装：下载 `dist.zip` 文件，解压后将 dist 目录拖拽进 `chrome://extensions/` 页面（前提是打开 “开发者模式”），本项目暂未上架 chrome 应用商店
 - 本地程序安装：
   - Mac 系统：下载 `GoDownload.dmg` 磁盘进行安装，在启动台找到 GoDownload 并运行
   - Windows 系统：下载 `GoDownload.exe` 便携式程序直接运行
@@ -57,6 +57,11 @@ npm run watch
 2. 打开右上角 “开发者模式”
 3. 点击 “加载已解压的扩展程序（Load unpacked）”，选择仓库中的 `go-download-ext/dist` 目录
 4. 点击 Go Download 扩展的 Service Worker 即可对扩展进行调试
+
+## 打包项目
+
+- 后端程序打包依赖 make 工具，各步骤详见 makefile 文件
+- 扩展程序的打包步骤则与上述开发步骤一致
 
 ## 致谢
 
