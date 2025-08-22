@@ -1,0 +1,26 @@
+{
+  "RT_GROUP_ICON": {
+    "APP": {
+      "0000": "../build/resources/icon.ico"
+    }
+  },
+  "RT_VERSION": {
+    "#1": {
+      "0000": {
+        "fixed": {
+          "file_version": "1.0.0.0",
+          "product_version": "1.0.0.0"
+        },
+        "info": {
+          "0409": {
+            "FileDescription": "GoDownload",
+            "FileVersion": "1.0.0.0",
+            "ProductName": "GoDownload",
+            "ProductVersion": "1.0.0.0",
+            "CompanyName": "org.lxy.go-download"
+          }
+        }
+      }
+    }
+  }
+}
