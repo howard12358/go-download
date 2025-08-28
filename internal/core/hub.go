@@ -9,8 +9,9 @@ const (
 )
 
 type Progress struct {
-	Percent int   `json:"percent"`
-	Speed   int64 `json:"speed"` // bytes per second
+	Downloaded int64 `json:"downloaded"`
+	Total      int64 `json:"total"`
+	Speed      int64 `json:"speed"` // bytes per second
 }
 
 // Hub 管理多个任务的订阅者

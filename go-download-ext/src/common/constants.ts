@@ -13,7 +13,8 @@ export type MsgType = typeof MSG[keyof typeof MSG];
 // storage key 命名（建议统一前缀 gd_）
 export const STORAGE = {
     HISTORY: 'history',
-    PERCENT_PREFIX: 'percent_', // 用：STORAGE.PERCENT_PREFIX + id
+    DOWNLOADED_PREFIX: 'downloaded_', // 用：STORAGE.DOWNLOADED_PREFIX + id
+    TOTAL_PREFIX: 'total_', // 用：STORAGE.TOTAL_PREFIX + id
     SPEED_PREFIX: 'speed_', // 用：STORAGE.SPEED_PREFIX + id
 } as const;
 

@@ -271,3 +271,140 @@ summary {
     font-size: 11px;
     color: var(--muted);
 }
+
+/* 行布局相关 */
+.row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+/* 第一行 */
+.row-top {
+    justify-content: space-between;
+    gap: 8px;
+}
+
+/* URL：左侧，单行省略 */
+.history-link {
+    display: block;
+    flex: 1 1 auto;
+    font-size: 14px;
+    color: #222;
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-right: 8px;
+}
+
+/* 状态放在右侧 */
+.status-wrap {
+    flex: 0 0 auto;
+    margin-left: 6px;
+}
+
+/* 第二行：元信息 */
+.row-meta {
+    justify-content: space-between;
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.meta-left {
+    flex: 1 1 auto;
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.meta-right {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+}
+
+/* 分隔符样式（点） */
+.sep {
+    color: var(--muted);
+    margin: 0 4px;
+    user-select: none;
+}
+
+/* 进度占一行并且更紧凑 */
+.row-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+/* 使用你原有的进度条视觉，但确保占满宽度 */
+.progress-bg {
+    width: 100%;
+    height: 8px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #efefef;
+    position: relative;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-dark));
+    transition: width 200ms linear;
+}
+
+/* 进度条下方的右侧 meta（显示已下载/百分比） */
+.progress-meta {
+    display: flex;
+    justify-content: flex-end;
+    font-size: 11px;
+    color: var(--muted);
+}
+
+/* 让数字使用表格数字（等宽）避免宽度抖动 */
+.meta-item, .progress-meta-right {
+    font-variant-numeric: tabular-nums; /* 现代浏览器支持 */
+    -moz-font-feature-settings: "tnum" 1;
+    -webkit-font-feature-settings: "tnum";
+}
+
+/* 为右侧 meta 区域保留固定空间，避免元素出现/消失导致布局改变 */
+.meta-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 180px; /* ↑ 固定宽度（调整到合适值） */
+    justify-content: flex-end;
+}
+
+/* 给每个数值字段设定最小宽度并右对齐 */
+.meta-item {
+    min-width: 84px; /* 根据最多可能的文本长度调整 */
+    text-align: right;
+    white-space: nowrap;
+    display: inline-block;
+}
+
+/* 如果想把单位单独放一列（数字为等宽），可用以下样式 */
+.meta-item .num {
+    display: inline-block;
+    min-width: 60px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.meta-item .unit {
+    margin-left: 6px;
+    opacity: 0.85;
+    font-size: 11px;
+}
+
+/* 进度条平滑 */
+.progress-fill {
+    transition: width 200ms linear; /* 已有，确保存在 */
+    will-change: width;
+}

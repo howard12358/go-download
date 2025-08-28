@@ -47,21 +47,19 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         })
             .then(r => r.json())
             .then(data => {
-                const {id, status} = data || {};
+                const {id, status, size} = data || {};
                 if (status === 'success' && id) {
                     // 写入 history（唯一负责写 history 的位置）
-                    upsertHistoryEntry({id, url: info.linkUrl, ts: Date.now(), status: 'pending'});
-                    // push history (recent first, cap 100)
-                    // chrome.storage.local.get({history: []}, res => {
-                    //     const hist = res.history || [];
-                    //     hist.unshift({id, url: info.linkUrl, ts: Date.now(), status: 'pending'});
-                    //     if (hist.length > APP.HISTORY_MAX) hist.length = APP.HISTORY_MAX;
-                    //     chrome.storage.local.set({history: hist}, () => {
-                    //         // notify options/popup if open (安全发送)
-                    //         safeSendMessage({type: MSG.ADD_HISTORY, item: {id, url: info.linkUrl}});
-                    //     });
+                    upsertHistoryEntry({id, url: info.linkUrl, ts: Date.now(), status: 'pending', size: size});
+                    // safeSendMessage({
+                    //     type: MSG.ADD_HISTORY,
+                    //     id: id,
+                    //     url: info.linkUrl,
+                    //     ts: Date.now(),
+                    //     status: 'pending',
+                    //     size: size
                     // });
-
+                    console.log('openProgressSSE', id)
                     openProgressSSE(id);
                 } else {
                     console.error('download API error:', data);
@@ -85,32 +83,34 @@ function openProgressSSE(id) {
 
         es.onmessage = (e) => {
             const data = JSON.parse(e.data);
-            const percent = data.percent || 0;
+            const downloaded = data.downloaded || 0;
+            const total = data.total || 0;
             const speed = data.speed || 0;
 
             // 写当前进度到 storage（覆盖）
-            chrome.storage.local.set({[STORAGE.PERCENT_PREFIX + id]: percent});
+            chrome.storage.local.set({[STORAGE.DOWNLOADED_PREFIX + id]: downloaded});
+            chrome.storage.local.set({[STORAGE.TOTAL_PREFIX + id]: total});
             chrome.storage.local.set({[STORAGE.SPEED_PREFIX + id]: speed});
 
             // 如果达到 100%，标记为完成（更新 history）
-            if (percent >= 100) {
+            if (downloaded >= total) {
                 markHistoryDone(id);
             }
 
             // 节流 / 合并：最小时间间隔或变化阈值
             const now = Date.now();
-            const prev = lastForward.get(id) || {time: 0, percent: -1};
-            if (now - prev.time < 10 && Math.abs(percent - prev.percent) < 1) {
-                // 已写 storage，但不再转发消息（节流）
-                return;
-            }
-            lastForward.set(id, {time: now, percent});
+            // const prev = lastForward.get(id) || {time: 0, downloaded: 0, total: 0};
+            // if (now - prev.time < 10 && Math.abs(downloaded - prev.percent) < 1) {
+            //     // 已写 storage，但不再转发消息（节流）
+            //     return;
+            // }
+            lastForward.set(id, {time: now, downloaded: downloaded, total: total});
 
             // 向打开的前端安全转发进度消息
-            safeSendMessage({type: MSG.DOWNLOAD_PROGRESS, id, percent, speed});
+            safeSendMessage({type: MSG.DOWNLOAD_PROGRESS, id, downloaded, total, speed});
 
             // 当任务完成时：清理 SSE、本地内存，并在延迟后移除持久化进度
-            if (percent >= 100) {
+            if (downloaded >= total) {
                 try {
                     es.close();
                 } catch (err) {
@@ -122,14 +122,16 @@ function openProgressSSE(id) {
                 const delay = typeof PROGRESS_CLEANUP_DELAY_MS !== 'undefined' ? PROGRESS_CLEANUP_DELAY_MS : 5000;
                 setTimeout(() => {
                     try {
-                        chrome.storage.local.remove(STORAGE.PERCENT_PREFIX + id, () => {
+                        chrome.storage.local.remove(STORAGE.DOWNLOADED_PREFIX + id, () => {
                             // 可选：检查 chrome.runtime.lastError
                             if (chrome.runtime.lastError) {
-                                // 静默忽略
-                                // console.debug('remove gd_progress error', chrome.runtime.lastError.message);
                             }
                         });
                         chrome.storage.local.remove(STORAGE.SPEED_PREFIX + id, () => {
+                            if (chrome.runtime.lastError) {
+                            }
+                        });
+                        chrome.storage.local.remove(STORAGE.TOTAL_PREFIX + id, () => {
                             if (chrome.runtime.lastError) {
                             }
                         });
@@ -173,7 +175,6 @@ function markHistoryDone(id) {
 }
 
 function upsertHistoryEntry(entry) {
-    // entry 结构： { id, url?, ts?, status? }
     chrome.storage.local.get({history: []}, res => {
         const hist = res.history || [];
         const idx = hist.findIndex(h => h.id === entry.id);
@@ -184,7 +185,8 @@ function upsertHistoryEntry(entry) {
                 id: entry.id,
                 url: entry.url || null,
                 ts: entry.ts || Date.now(),
-                status: entry.status || 'pending'
+                status: entry.status || 'pending',
+                size: entry.size || 0
             };
             hist.unshift(e);
         } else {
@@ -194,14 +196,22 @@ function upsertHistoryEntry(entry) {
             // prefer more recent ts if provided
             if (entry.ts && (!cur.ts || entry.ts > cur.ts)) cur.ts = entry.ts;
             if (entry.status) cur.status = entry.status;
+            if (entry.size) cur.size = entry.size;
         }
 
         // cap length
         if (hist.length > APP.HISTORY_MAX) hist.length = APP.HISTORY_MAX;
 
         chrome.storage.local.set({history: hist}, () => {
-            // notify UI if needed (safe)
-            safeSendMessage({type: MSG.ADD_HISTORY, item: {id: entry.id, url: entry.url || null}});
+            safeSendMessage({
+                type: MSG.ADD_HISTORY,
+
+                id: entry.id,
+                url: entry.url,
+                ts: entry.ts || Date.now(),
+                status: entry.status || 'pending',
+                size: entry.size || 0
+            });
         });
     });
 }

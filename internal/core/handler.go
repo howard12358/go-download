@@ -30,10 +30,11 @@ func DownloadHandler(c *gin.Context, hub *Hub) {
 		cli := pget.New()
 		hub.NewTask(id)
 		cli.ProgressFn = func(downloaded, total, speed int64) {
-			percent := int(float64(downloaded) / float64(total) * 100)
+			//percent := int(float64(downloaded) / float64(total) * 100)
 			hub.Publish(id, Progress{
-				Percent: percent,
-				Speed:   speed,
+				Downloaded: downloaded,
+				Total:      total,
+				Speed:      speed,
 			})
 		}
 		ags := common.ToPgetArgs(url, req)
@@ -46,13 +47,24 @@ func DownloadHandler(c *gin.Context, hub *Hub) {
 		}
 
 		// 确保结束后推 100%
-		hub.Publish(id, Progress{100, 0})
+		//hub.Publish(id, Progress{100, 0})
 	}(req.URL)
 
+	// 查询文件大小
+	client := pget.NewClientByProxy(16, req.ProxyUrl)
+	r, err := http.NewRequest("HEAD", req.URL, nil)
+	if err != nil {
+		log.Println("new request failed:", err)
+	}
+	res, err := client.Do(r)
+	if err != nil {
+		log.Println("failed to head request:", err)
+	}
 	// 3. 马上返回成功
 	c.JSON(200, gin.H{
 		"status": "success",
 		"id":     id,
+		"size":   res.ContentLength,
 	})
 }
 
@@ -78,7 +90,7 @@ func ProgressSSE(c *gin.Context, hub *Hub) {
 	defer ticker.Stop()
 
 	// 缓存最近接收到但还未发送的进度
-	lastProg := Progress{0, 0}
+	lastProg := Progress{}
 	pending := false
 
 	ctx := c.Request.Context()
@@ -117,10 +129,11 @@ func ProgressSSE(c *gin.Context, hub *Hub) {
 			if prog.Speed > 0 {
 				lastProg = prog
 			} else {
-				lastProg.Percent = prog.Percent
+				lastProg.Downloaded = prog.Downloaded
+				lastProg.Total = prog.Total
 			}
 			pending = true
-			if lastProg.Percent >= 100 {
+			if lastProg.Downloaded >= lastProg.Total {
 				send(lastProg)
 				log.Println("download finished, id:", id)
 				return

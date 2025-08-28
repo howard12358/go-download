@@ -10,6 +10,10 @@ import (
 	"time"
 )
 
+func NewClientByProxy(maxIdleConnsPerHost int, proxy string) *http.Client {
+	return newDownloadClientByProxy(maxIdleConnsPerHost, proxy)
+}
+
 func newDownloadClientByProxy(maxIdleConnsPerHost int, proxy string) *http.Client {
 	tr := http.DefaultTransport.(*http.Transport).Clone()
 	dialer := newDialRateLimiter(&net.Dialer{

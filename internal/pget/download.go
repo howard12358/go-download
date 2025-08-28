@@ -209,7 +209,7 @@ func parallelDownload(ctx context.Context, c *parallelDownloadConfig) error {
 	var downloaded int64
 
 	// 启动采样器，定时计算下载速度
-	sampleInterval := 2 * time.Second
+	sampleInterval := 1500 * time.Millisecond
 	if c.DownloadConfig != nil && c.DownloadConfig.ProgressFn != nil {
 		// 使用一个 goroutine 周期性计算 delta / 秒上报 speed
 		eg.Go(func() error {
