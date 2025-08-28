@@ -3,7 +3,7 @@ package main
 import (
 	_ "embed"
 	"github.com/getlantern/systray"
-	"go-download/internal/route"
+	"go-download/internal/core/route"
 	"log"
 	"runtime"
 )

@@ -51,14 +51,6 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
                 if (status === 'success' && id) {
                     // 写入 history（唯一负责写 history 的位置）
                     upsertHistoryEntry({id, url: info.linkUrl, ts: Date.now(), status: 'pending', size: size});
-                    // safeSendMessage({
-                    //     type: MSG.ADD_HISTORY,
-                    //     id: id,
-                    //     url: info.linkUrl,
-                    //     ts: Date.now(),
-                    //     status: 'pending',
-                    //     size: size
-                    // });
                     console.log('openProgressSSE', id)
                     openProgressSSE(id);
                 } else {

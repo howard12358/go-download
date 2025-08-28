@@ -324,12 +324,13 @@ summary {
     align-items: center;
     gap: 8px;
     color: var(--muted);
+    font-size: 11px;
 }
 
 /* 分隔符样式（点） */
 .sep {
     color: var(--muted);
-    margin: 0 4px;
+    margin: 0 2px;
     user-select: none;
 }
 
@@ -363,48 +364,4 @@ summary {
     justify-content: flex-end;
     font-size: 11px;
     color: var(--muted);
-}
-
-/* 让数字使用表格数字（等宽）避免宽度抖动 */
-.meta-item, .progress-meta-right {
-    font-variant-numeric: tabular-nums; /* 现代浏览器支持 */
-    -moz-font-feature-settings: "tnum" 1;
-    -webkit-font-feature-settings: "tnum";
-}
-
-/* 为右侧 meta 区域保留固定空间，避免元素出现/消失导致布局改变 */
-.meta-right {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex: 0 0 180px; /* ↑ 固定宽度（调整到合适值） */
-    justify-content: flex-end;
-}
-
-/* 给每个数值字段设定最小宽度并右对齐 */
-.meta-item {
-    min-width: 84px; /* 根据最多可能的文本长度调整 */
-    text-align: right;
-    white-space: nowrap;
-    display: inline-block;
-}
-
-/* 如果想把单位单独放一列（数字为等宽），可用以下样式 */
-.meta-item .num {
-    display: inline-block;
-    min-width: 60px;
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-}
-
-.meta-item .unit {
-    margin-left: 6px;
-    opacity: 0.85;
-    font-size: 11px;
-}
-
-/* 进度条平滑 */
-.progress-fill {
-    transition: width 200ms linear; /* 已有，确保存在 */
-    will-change: width;
 }

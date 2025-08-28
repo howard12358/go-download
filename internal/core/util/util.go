@@ -1,12 +1,13 @@
-package common
+package util
 
 import (
+	"go-download/internal/core/types"
 	"os"
 	"path/filepath"
 	"runtime"
 )
 
-func ToPgetArgs(url string, req Request) []string {
+func ToPgetArgs(url string, req types.Request) []string {
 	var ags []string
 	if req.ProxyUrl != "" {
 		ags = append(ags, "-x")

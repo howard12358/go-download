@@ -11,7 +11,9 @@
             <div class="row row-top">
               <a href="#"
                  :title="item.url || '(no url)'"
-                 class="history-link">
+                 class="history-link"
+                 @click="handleClickUrl"
+              >
                 {{ ellipsisMiddle(item.url) }}
               </a>
 
@@ -34,7 +36,6 @@
               <div class="meta-right">
                 <!-- 仅在“下载中”显示速度与已下载百分比 -->
                 <template v-if="(item.status !== 'done') && (downloadedRecord[item.id] || 0) > 0">
-                  <span class="sep">·</span>
                   <span class="meta-item">{{ formatSpeed(speedRecord[item.id] || 0) }}</span>
 
                   <span class="meta-item">
@@ -262,6 +263,11 @@ function formatTime(ts: number): string {
   }
 }
 
+function handleClickUrl(){
+  fetch(`${BASE_URL}/gd/open-dir?path=${downloadPath.value}`)
+      .then(r => r.json())
+      .catch(e => alert('无法联系本地服务: ' + e))
+}
 
 onMounted(() => {
   loadSettings()

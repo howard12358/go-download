@@ -1,28 +1,26 @@
-package core
+package http
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/goccy/go-json"
 	"github.com/google/uuid"
-	"github.com/sqweek/dialog"
-	"go-download/internal/common"
+	"github.com/pkg/errors"
+	"go-download/internal/core/sse"
+	"go-download/internal/core/types"
+	"go-download/internal/core/util"
 	"go-download/internal/pget"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"time"
 )
 
-// DownloadHandler 处理文件下载请求
-func DownloadHandler(c *gin.Context, hub *Hub) {
-	var req common.Request
-	// 1. 绑定 JSON
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
-		return
-	}
+func doDownload(c *gin.Context, hub *sse.Hub, req types.Request) {
 	id := uuid.New().String()
 	log.Println("start download, id:", id)
 	// 2. 异步调用 pget
@@ -31,14 +29,14 @@ func DownloadHandler(c *gin.Context, hub *Hub) {
 		hub.NewTask(id)
 		cli.ProgressFn = func(downloaded, total, speed int64) {
 			//percent := int(float64(downloaded) / float64(total) * 100)
-			hub.Publish(id, Progress{
+			hub.Publish(id, sse.Progress{
 				Downloaded: downloaded,
 				Total:      total,
 				Speed:      speed,
 			})
 		}
-		ags := common.ToPgetArgs(url, req)
-		if err := cli.Run(context.Background(), common.Version, ags); err != nil {
+		ags := util.ToPgetArgs(url, req)
+		if err := cli.Run(context.Background(), types.Version, ags); err != nil {
 			if cli.Trace {
 				fmt.Fprintf(os.Stderr, "Error:\n%+v\n", err)
 			} else {
@@ -68,15 +66,7 @@ func DownloadHandler(c *gin.Context, hub *Hub) {
 	})
 }
 
-const interval = 50 * time.Millisecond
-
-// ProgressSSE 新增一个 /progress/:id SSE endpoint
-func ProgressSSE(c *gin.Context, hub *Hub) {
-	id := c.Param("id")
-	if _, ok := hub.Subs[id]; !ok {
-		c.JSON(201, gin.H{"msg": "task finished"})
-		return
-	}
+func sseConnect(c *gin.Context, hub *sse.Hub, id string) {
 	ch := hub.Subscribe(id)
 	defer hub.Unsubscribe(id, ch)
 
@@ -90,13 +80,13 @@ func ProgressSSE(c *gin.Context, hub *Hub) {
 	defer ticker.Stop()
 
 	// 缓存最近接收到但还未发送的进度
-	lastProg := Progress{}
+	lastProg := sse.Progress{}
 	pending := false
 
 	ctx := c.Request.Context()
 
 	// helper: 立即发送一次数据
-	send := func(p Progress) {
+	send := func(p sse.Progress) {
 		data, err := json.Marshal(p)
 		if err != nil {
 			log.Println("marshal progress failed:", err)
@@ -148,12 +138,57 @@ func ProgressSSE(c *gin.Context, hub *Hub) {
 	}
 }
 
-// ChooseDirHandler 处理选择下载目录请求
-func ChooseDirHandler(c *gin.Context) {
-	path, err := dialog.Directory().Title("请选择下载目录").Browse()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+func openInFileManager(path string) error {
+	if path == "" {
+		return errors.New("empty path")
 	}
-	c.JSON(http.StatusOK, gin.H{"path": path})
+
+	// 绝对化并清理路径
+	p, err := filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+	p = filepath.Clean(p)
+
+	// 检查是否存在
+	fi, err := os.Stat(p)
+	if err != nil {
+		return err
+	}
+
+	isFile := !fi.IsDir()
+
+	switch runtime.GOOS {
+	case "darwin":
+		// macOS: open path （文件用 -R reveal）
+		if isFile {
+			// -R : reveal the file in Finder
+			cmd := exec.Command("open", "-R", p)
+			return cmd.Start()
+		}
+		cmd := exec.Command("open", p)
+		return cmd.Start()
+
+	case "windows":
+		// Windows: explorer.exe path  ; 若为文件，使用 /select,PATH
+		// explorer 参数通常以单个字符串传递： "/select,C:\path\to\file"
+		if isFile {
+			arg := "/select," + p
+			cmd := exec.Command("explorer", arg)
+			return cmd.Start()
+		}
+		cmd := exec.Command("explorer", p)
+		return cmd.Start()
+
+	default:
+		// 大多数 Linux 发行版：xdg-open（GNOME下也可用 nautilus，但 xdg-open 更通用）
+		// 如果是文件，打开所在目录（并不一定能选中文件，xdg-open 不支持 select）
+		if isFile {
+			dir := filepath.Dir(p)
+			cmd := exec.Command("xdg-open", dir)
+			return cmd.Start()
+		}
+		cmd := exec.Command("xdg-open", p)
+		return cmd.Start()
+	}
 }
