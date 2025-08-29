@@ -1,5 +1,6 @@
 // 后端 base URL（开发/生产可用 import.meta.env 覆盖）
 export const BASE_URL = 'http://127.0.0.1:11235';
+export const SERVER_BASE = `${BASE_URL}/gd`;
 
 // 消息类型（统一名称，避免字符串拼写错误）
 export const MSG = {

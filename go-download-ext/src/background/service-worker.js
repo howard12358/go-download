@@ -1,7 +1,5 @@
-// src/background/service-worker.js
-import {APP, MSG, PROGRESS_CLEANUP_DELAY_MS, STORAGE} from "../types/constants";
+import {APP, MSG, PROGRESS_CLEANUP_DELAY_MS, SERVER_BASE, STORAGE} from "../types/constants";
 
-const SERVER_BASE = 'http://127.0.0.1:11235/gd';
 const sseMap = new Map(); // id -> EventSource
 const lastForward = new Map(); // id -> {time, percent}
 
@@ -51,7 +49,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
                 if (res.code === 0 && id) {
                     // 写入 history（唯一负责写 history 的位置）
                     upsertHistoryEntry({id, url: info.linkUrl, ts: Date.now(), status: 'pending', size: size});
-                    console.log('openProgressSSE', id)
+
                     openProgressSSE(id);
                 } else {
                     console.error('download API error:', res.code, res.message);

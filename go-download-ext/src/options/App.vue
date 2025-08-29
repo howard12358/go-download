@@ -85,7 +85,7 @@
 
 <script setup lang="ts">
 import {onMounted, reactive, ref, toRefs} from 'vue'
-import {BASE_URL, MSG} from "../types/constants";
+import {MSG, SERVER_BASE} from "../types/constants";
 
 const history = ref<Array<any>>([])
 const speedRecord = reactive<Record<string, number>>({})
@@ -154,7 +154,7 @@ function saveSettings() {
 }
 
 function chooseDir() {
-  fetch(`${BASE_URL}/gd/choose-dir`)
+  fetch(`${SERVER_BASE}/choose-dir`)
       .then(r => r.json())
       .then(res => {
         if (res.code === 0) {
@@ -254,21 +254,27 @@ function formatTime(ts: number): string {
   // 昨天 0 点
   const yesterdayStart = todayStart - 24 * 60 * 60 * 1000;
 
+  // 本周一 0 点（注意 JS 的 getDay: 周日=0）
+  const dayOfWeek = now.getDay() === 0 ? 7 : now.getDay();
+  const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (dayOfWeek - 1)).getTime();
+
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  const timeStr = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+
   if (ts >= todayStart) {
-    // 今天
-    return `今天 ${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
+    return `今天 ${timeStr}`;
   } else if (ts >= yesterdayStart) {
-    // 昨天
-    return `昨天 ${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
+    return `昨天 ${timeStr}`;
+  } else if (ts >= weekStart) {
+    const weekNames = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+    return `${weekNames[date.getDay()]} ${timeStr}`;
   } else {
-    // 其它日期
-    return `${date.getFullYear()}/${(date.getMonth() + 1).toString().padStart(2, "0")}/${date.getDate().toString().padStart(2, "0")} ` +
-        `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
+    return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${timeStr}`;
   }
 }
 
 function handleClickUrl() {
-  fetch(`${BASE_URL}/gd/open-dir?path=${downloadPath.value}`)
+  fetch(`${SERVER_BASE}/open-dir?path=${downloadPath.value}`)
       .then(r => r.json())
       .then(res => {
         if (res.code !== 0) {
