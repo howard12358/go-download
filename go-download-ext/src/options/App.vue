@@ -85,7 +85,7 @@
 
 <script setup lang="ts">
 import {onMounted, reactive, ref, toRefs} from 'vue'
-import {BASE_URL, MSG} from "../common/constants";
+import {BASE_URL, MSG} from "../types/constants";
 
 const history = ref<Array<any>>([])
 const speedRecord = reactive<Record<string, number>>({})

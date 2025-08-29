@@ -1,4 +1,4 @@
-package http
+package service
 
 import (
 	"context"
@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/goccy/go-json"
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
 	"go-download/internal/core/sse"
 	"go-download/internal/core/types"
 	"go-download/internal/core/util"
@@ -20,16 +19,25 @@ import (
 	"time"
 )
 
-func doDownload(c *gin.Context, hub *sse.Hub, req types.Request) {
+// DownloadService 把下载相关逻辑封装到结构体
+type DownloadService struct {
+	hub *sse.Hub
+}
+
+func NewDownloadService(hub *sse.Hub) *DownloadService {
+	return &DownloadService{hub: hub}
+}
+
+func (s *DownloadService) DoDownload(c *gin.Context, req types.Request) {
 	id := uuid.New().String()
+	s.hub.NewTask(id) // 同步注册任务，避免竞态
 	log.Println("start download, id:", id)
 	// 2. 异步调用 pget
 	go func(url string) {
 		cli := pget.New()
-		hub.NewTask(id)
 		cli.ProgressFn = func(downloaded, total, speed int64) {
 			//percent := int(float64(downloaded) / float64(total) * 100)
-			hub.Publish(id, sse.Progress{
+			s.hub.Publish(id, sse.Progress{
 				Downloaded: downloaded,
 				Total:      total,
 				Speed:      speed,
@@ -43,9 +51,6 @@ func doDownload(c *gin.Context, hub *sse.Hub, req types.Request) {
 				fmt.Fprintf(os.Stderr, "Error:\n  %v\n", err)
 			}
 		}
-
-		// 确保结束后推 100%
-		//hub.Publish(id, Progress{100, 0})
 	}(req.URL)
 
 	// 查询文件大小
@@ -66,9 +71,11 @@ func doDownload(c *gin.Context, hub *sse.Hub, req types.Request) {
 	})
 }
 
-func sseConnect(c *gin.Context, hub *sse.Hub, id string) {
-	ch := hub.Subscribe(id)
-	defer hub.Unsubscribe(id, ch)
+const throttleInterval = 50 * time.Millisecond
+
+func (s *DownloadService) SSEConnect(c *gin.Context, id string) {
+	ch := s.hub.Subscribe(id)
+	defer s.hub.Unsubscribe(id, ch)
 
 	// SSE headers
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
@@ -76,8 +83,8 @@ func sseConnect(c *gin.Context, hub *sse.Hub, id string) {
 	c.Writer.Header().Set("Connection", "keep-alive")
 
 	// 用 ticker 做节流，间隔 50ms
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
+	throttle := time.NewTicker(throttleInterval)
+	defer throttle.Stop()
 
 	// 缓存最近接收到但还未发送的进度
 	lastProg := sse.Progress{}
@@ -128,7 +135,7 @@ func sseConnect(c *gin.Context, hub *sse.Hub, id string) {
 				log.Println("download finished, id:", id)
 				return
 			}
-		case <-ticker.C:
+		case <-throttle.C:
 			// 周期性发送最新的进度，对高频的进度上报进行节流
 			if pending {
 				send(lastProg)
@@ -138,9 +145,9 @@ func sseConnect(c *gin.Context, hub *sse.Hub, id string) {
 	}
 }
 
-func openInFileManager(path string) error {
+func (s *DownloadService) OpenInFileManager(path string) error {
 	if path == "" {
-		return errors.New("empty path")
+		return fmt.Errorf("empty path")
 	}
 
 	// 绝对化并清理路径

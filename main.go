@@ -1,11 +1,17 @@
 package main
 
 import (
+	"context"
 	_ "embed"
+	"errors"
 	"github.com/getlantern/systray"
 	"go-download/internal/core/route"
+	"go-download/internal/core/service"
+	"go-download/internal/core/sse"
 	"log"
+	"net/http"
 	"runtime"
+	"time"
 )
 
 // 把生成的 icon.icns 放到 resources 中并编译进二进制
@@ -16,11 +22,22 @@ var darwinIcon []byte
 //go:embed build/resources/icon.ico
 var windowsIcon []byte
 
-func main() {
-	systray.Run(onReady, onExit)
+type App struct {
+	server *http.Server
+	hub    *sse.Hub
+	svc    *service.DownloadService
 }
 
-func onReady() {
+func NewApp() *App {
+	hub := sse.NewHub()
+	svc := service.NewDownloadService(hub)
+	return &App{
+		hub: hub,
+		svc: svc,
+	}
+}
+
+func (a *App) onReady() {
 	// 设置图标与提示
 	if runtime.GOOS == "windows" {
 		systray.SetIcon(windowsIcon)
@@ -40,7 +57,8 @@ func onReady() {
 	// 退出菜单
 	mQuit := systray.AddMenuItem("退出", "退出应用")
 
-	go startBackend()
+	// 启动后端
+	go a.startBackend()
 
 	// 监听菜单事件
 	go func() {
@@ -54,14 +72,33 @@ func onReady() {
 	}()
 }
 
-func onExit() {
+func (a *App) onExit() {
+	// 优雅关闭 http server
+	if a.server != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := a.server.Shutdown(ctx); err != nil {
+			log.Printf("server shutdown error: %v\n", err)
+		} else {
+			log.Println("server stopped gracefully")
+		}
+	}
 }
 
-func startBackend() {
-	r := route.SetupRouter()
-	port := ":11235"
-	log.Printf("starting go-download server on %s...\n", port)
-	if err := r.Run(port); err != nil {
+func (a *App) startBackend() {
+	r := route.SetupRouter(a.hub, a.svc)
+	a.server = &http.Server{
+		Addr:    ":11235",
+		Handler: r,
+	}
+
+	log.Printf("starting go-download server on %s...\n", a.server.Addr)
+	if err := a.server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("failed to run server: %v", err)
 	}
+}
+
+func main() {
+	app := NewApp()
+	systray.Run(app.onReady, app.onExit)
 }

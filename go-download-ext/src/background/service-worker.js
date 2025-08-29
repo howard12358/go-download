@@ -1,5 +1,5 @@
 // src/background/service-worker.js
-import {APP, MSG, PROGRESS_CLEANUP_DELAY_MS, STORAGE} from "../common/constants";
+import {APP, MSG, PROGRESS_CLEANUP_DELAY_MS, STORAGE} from "../types/constants";
 
 const SERVER_BASE = 'http://127.0.0.1:11235/gd';
 const sseMap = new Map(); // id -> EventSource
