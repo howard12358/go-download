@@ -85,7 +85,8 @@
 
 <script setup lang="ts">
 import {onMounted, reactive, ref, toRefs} from 'vue'
-import {MSG, SERVER_BASE} from "../types/constants";
+import {MSG, SERVER_BASE} from "../types/constants"
+import {getHistory, syncMarkHistoryDone} from "../mutex/history"
 
 const history = ref<Array<any>>([])
 const speedRecord = reactive<Record<string, number>>({})
@@ -113,20 +114,15 @@ function loadSettings() {
 }
 
 async function loadHistory() {
-  // 使用 Promise 包装 chrome.storage callback，写法更直观
-  const res: any = await new Promise(resolve => {
-    chrome.storage.local.get({history: []}, resolve);
-  });
-
-  const hist: Array<any> = res.history || [];
-  history.value = hist;
+  const hist = await getHistory() || []
+  history.value = hist
 
   // 构建 id -> size 的临时映射（来自 storage 的历史数据）
-  const newTotals: Record<string, number> = {};
+  const newTotals: Record<string, number> = {}
   for (const item of hist) {
     if (item && item.id) {
-      const size = Number(item.size || 0);
-      newTotals[item.id] = Number.isNaN(size) ? 0 : size;
+      const size = Number(item.size || 0)
+      newTotals[item.id] = Number.isNaN(size) ? 0 : size
     }
   }
 
@@ -134,14 +130,14 @@ async function loadHistory() {
   // 1) 删除不再存在的 key
   for (const k of Object.keys(totalRecord)) {
     if (!(k in newTotals)) {
-      delete totalRecord[k];
+      delete totalRecord[k]
     }
   }
   // 2) 更新或新增，且仅在值变化时写入
   for (const k of Object.keys(newTotals)) {
-    const newV = newTotals[k];
+    const newV = newTotals[k]
     if (totalRecord[k] !== newV) {
-      totalRecord[k] = newV;
+      totalRecord[k] = newV
     }
   }
 }
@@ -178,37 +174,11 @@ function updateItemProgress(id: string, downloaded?: number, total?: number, spe
     // 清理速度显示（下载完成时隐藏）
     speedRecord[id] = 0
 
-    // refresh history status marker
-    chrome.storage.local.get({history: []}, res => {
-      const hist = res.history || []
-      let changed = false
-      for (let i = 0; i < hist.length; i++) {
-        if (hist[i].id === id) {
-          hist[i].status = 'done'
-          changed = true
-          break
-        }
-      }
-      if (changed) chrome.storage.local.set({history: hist}, loadHistory)
+    syncMarkHistoryDone(id).then(() => {
+      loadHistory()
     })
   }
 }
-
-// function removeHistoryItem(id: string) {
-//   chrome.storage.local.get({history: []}, res => {
-//     const hist = (res.history || []).filter((h: any) => h.id !== id)
-//     chrome.storage.local.set({history: hist}, () => {
-//       // 移除进度和速度的本地存储
-//       chrome.storage.local.remove(STORAGE.DOWNLOADED_PREFIX + id)
-//       chrome.storage.local.remove(STORAGE.TOTAL_PREFIX + id)
-//       chrome.storage.local.remove(STORAGE.SPEED_PREFIX + id)
-//       delete downloadedRecord[id]
-//       delete totalRecord[id]
-//       delete speedRecord[id]
-//       loadHistory()
-//     })
-//   })
-// }
 
 function statusText(id: string, s: string) {
   if (s === 'done') return '已完成'
@@ -217,9 +187,9 @@ function statusText(id: string, s: string) {
 }
 
 function ellipsisMiddle(url?: string) {
-  if (!url) return '(no url)';
-  if (url.length <= 35) return url;
-  return `${url.slice(0, 25)}…${url.slice(url.length - 6)}`;
+  if (!url) return '(no url)'
+  if (url.length <= 35) return url
+  return `${url.slice(0, 25)}…${url.slice(url.length - 6)}`
 }
 
 // 格式化 speed（bytes/sec）到可读字符串
@@ -237,39 +207,39 @@ function formatSpeed(bytesPerSec?: number) {
 }
 
 function formatBytes(bytes?: number) {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  const value = bytes / Math.pow(k, i);
-  return value.toFixed(1) + ' ' + sizes[i]; // 保留1位小数
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  const value = bytes / Math.pow(k, i)
+  return value.toFixed(1) + ' ' + sizes[i] // 保留1位小数
 }
 
 function formatTime(ts: number): string {
-  const date = new Date(ts);
-  const now = new Date();
+  const date = new Date(ts)
+  const now = new Date()
 
   // 今天 0 点
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
   // 昨天 0 点
-  const yesterdayStart = todayStart - 24 * 60 * 60 * 1000;
+  const yesterdayStart = todayStart - 24 * 60 * 60 * 1000
 
   // 本周一 0 点（注意 JS 的 getDay: 周日=0）
-  const dayOfWeek = now.getDay() === 0 ? 7 : now.getDay();
-  const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (dayOfWeek - 1)).getTime();
+  const dayOfWeek = now.getDay() === 0 ? 7 : now.getDay()
+  const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (dayOfWeek - 1)).getTime()
 
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  const timeStr = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  const pad = (n: number) => n.toString().padStart(2, "0")
+  const timeStr = `${pad(date.getHours())}:${pad(date.getMinutes())}`
 
   if (ts >= todayStart) {
-    return `今天 ${timeStr}`;
+    return `今天 ${timeStr}`
   } else if (ts >= yesterdayStart) {
-    return `昨天 ${timeStr}`;
+    return `昨天 ${timeStr}`
   } else if (ts >= weekStart) {
-    const weekNames = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
-    return `${weekNames[date.getDay()]} ${timeStr}`;
+    const weekNames = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
+    return `${weekNames[date.getDay()]} ${timeStr}`
   } else {
-    return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${timeStr}`;
+    return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${timeStr}`
   }
 }
 
@@ -291,9 +261,9 @@ onMounted(() => {
   chrome.runtime.onMessage.addListener((msg) => {
     if (!msg) return
     if (msg.type === MSG.DOWNLOAD_PROGRESS) {
-      const {id, downloaded, total, speed} = msg;
+      const {id, downloaded, total, speed} = msg
       if (id && typeof downloaded !== 'undefined' && typeof total !== 'undefined') {
-        updateItemProgress(id, downloaded, total, speed);
+        updateItemProgress(id, downloaded, total, speed)
       }
     } else if (msg.type === MSG.ADD_HISTORY) {
       const {id, url, ts, status, size} = msg

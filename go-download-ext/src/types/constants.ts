@@ -1,6 +1,6 @@
 // 后端 base URL（开发/生产可用 import.meta.env 覆盖）
-export const BASE_URL = 'http://127.0.0.1:11235';
-export const SERVER_BASE = `${BASE_URL}/gd`;
+export const BASE_URL = 'http://127.0.0.1:11235'
+export const SERVER_BASE = `${BASE_URL}/gd`
 
 // 消息类型（统一名称，避免字符串拼写错误）
 export const MSG = {
@@ -8,8 +8,8 @@ export const MSG = {
     DOWNLOAD_PROGRESS: 'DOWNLOAD_PROGRESS',
     ADD_HISTORY: 'ADD_HISTORY',
     // 如需新增，统一写在这里
-} as const;
-export type MsgType = typeof MSG[keyof typeof MSG];
+} as const
+export type MsgType = typeof MSG[keyof typeof MSG]
 
 // storage key 命名（建议统一前缀 gd_）
 export const STORAGE = {
@@ -17,13 +17,13 @@ export const STORAGE = {
     DOWNLOADED_PREFIX: 'downloaded_', // 用：STORAGE.DOWNLOADED_PREFIX + id
     TOTAL_PREFIX: 'total_', // 用：STORAGE.TOTAL_PREFIX + id
     SPEED_PREFIX: 'speed_', // 用：STORAGE.SPEED_PREFIX + id
-} as const;
+} as const
 
 // app level 配置
 export const APP = {
     HISTORY_MAX: 100,
     PROGRESS_THROTTLE_MS: 100, // 写 storage 的节流阈值（ms）
-} as const;
+} as const
 
 // 删除 storage 中进度条数据前的延迟（毫秒），调整为你想要的值；0 表示立即删除
-export const PROGRESS_CLEANUP_DELAY_MS = 5 * 1000;
+export const PROGRESS_CLEANUP_DELAY_MS = 5 * 1000
