@@ -6,9 +6,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/goccy/go-json"
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	"go-download/internal/core/sse"
 	"go-download/internal/core/types"
 	"go-download/internal/core/util"
+	"go-download/internal/core/util/r"
 	"go-download/internal/pget"
 	"log"
 	"net/http"
@@ -32,6 +34,12 @@ func (s *DownloadService) DoDownload(c *gin.Context, req types.Request) {
 	id := uuid.New().String()
 	s.hub.NewTask(id) // 同步注册任务，避免竞态
 	log.Println("start download, id:", id)
+
+	res, err := doHeadRequest(req)
+	if err != nil {
+		r.Error(c, http.StatusNotAcceptable, err.Error())
+		return
+	}
 	// 2. 异步调用 pget
 	go func(url string) {
 		cli := pget.New()
@@ -53,6 +61,14 @@ func (s *DownloadService) DoDownload(c *gin.Context, req types.Request) {
 		}
 	}(req.URL)
 
+	// 3. 马上返回成功
+	r.Success(c, gin.H{
+		"id":   id,
+		"size": res.ContentLength,
+	})
+}
+
+func doHeadRequest(req types.Request) (*http.Response, error) {
 	// 查询文件大小
 	client := pget.NewClientByProxy(16, req.ProxyUrl)
 	r, err := http.NewRequest("HEAD", req.URL, nil)
@@ -62,16 +78,19 @@ func (s *DownloadService) DoDownload(c *gin.Context, req types.Request) {
 	res, err := client.Do(r)
 	if err != nil {
 		log.Println("failed to head request:", err)
+		return res, err
 	}
-	// 3. 马上返回成功
-	c.JSON(200, gin.H{
-		"status": "success",
-		"id":     id,
-		"size":   res.ContentLength,
-	})
+
+	if res.Header.Get("Accept-Ranges") != "bytes" {
+		return res, errors.New("does not support range request")
+	}
+	if res.ContentLength <= 0 {
+		return res, errors.New("invalid content length")
+	}
+	return res, nil
 }
 
-const throttleInterval = 50 * time.Millisecond
+const throttleInterval = 100 * time.Millisecond
 
 func (s *DownloadService) SSEConnect(c *gin.Context, id string) {
 	ch := s.hub.Subscribe(id)

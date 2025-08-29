@@ -46,15 +46,15 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
             body: JSON.stringify(body)
         })
             .then(r => r.json())
-            .then(data => {
-                const {id, status, size} = data || {};
-                if (status === 'success' && id) {
+            .then(res => {
+                const {id, size} = res.data || {};
+                if (res.code === 0 && id) {
                     // 写入 history（唯一负责写 history 的位置）
                     upsertHistoryEntry({id, url: info.linkUrl, ts: Date.now(), status: 'pending', size: size});
                     console.log('openProgressSSE', id)
                     openProgressSSE(id);
                 } else {
-                    console.error('download API error:', data);
+                    console.error('download API error:', res.code, res.message);
                 }
             })
             .catch(err => {

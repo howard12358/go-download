@@ -37,7 +37,7 @@ func NewApp() *App {
 	}
 }
 
-func (a *App) onReady() {
+func (app *App) onReady() {
 	// 设置图标与提示
 	if runtime.GOOS == "windows" {
 		systray.SetIcon(windowsIcon)
@@ -58,7 +58,7 @@ func (a *App) onReady() {
 	mQuit := systray.AddMenuItem("退出", "退出应用")
 
 	// 启动后端
-	go a.startBackend()
+	go app.startBackend()
 
 	// 监听菜单事件
 	go func() {
@@ -72,12 +72,12 @@ func (a *App) onReady() {
 	}()
 }
 
-func (a *App) onExit() {
+func (app *App) onExit() {
 	// 优雅关闭 http server
-	if a.server != nil {
+	if app.server != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		if err := a.server.Shutdown(ctx); err != nil {
+		if err := app.server.Shutdown(ctx); err != nil {
 			log.Printf("server shutdown error: %v\n", err)
 		} else {
 			log.Println("server stopped gracefully")
@@ -85,15 +85,15 @@ func (a *App) onExit() {
 	}
 }
 
-func (a *App) startBackend() {
-	r := route.SetupRouter(a.hub, a.svc)
-	a.server = &http.Server{
+func (app *App) startBackend() {
+	r := route.SetupRouter(app.hub, app.svc)
+	app.server = &http.Server{
 		Addr:    ":11235",
 		Handler: r,
 	}
 
-	log.Printf("starting go-download server on %s...\n", a.server.Addr)
-	if err := a.server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	log.Printf("starting go-download server on %s...\n", app.server.Addr)
+	if err := app.server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("failed to run server: %v", err)
 	}
 }

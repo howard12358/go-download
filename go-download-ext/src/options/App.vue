@@ -156,8 +156,12 @@ function saveSettings() {
 function chooseDir() {
   fetch(`${BASE_URL}/gd/choose-dir`)
       .then(r => r.json())
-      .then(d => {
-        if (d.path) downloadPath.value = d.path
+      .then(res => {
+        if (res.code === 0) {
+          if (res.data.path) downloadPath.value = res.data.path
+        } else {
+          console.log('choose dir error', res.message)
+        }
       })
       .catch(e => alert('无法联系本地服务: ' + e))
 }
@@ -167,9 +171,9 @@ function updateItemProgress(id: string, downloaded?: number, total?: number, spe
     totalRecord[id] = total
   }
   if (typeof downloaded === 'number' && !Number.isNaN(downloaded)) {
-    downloadedRecord[id] = downloaded
+    downloadedRecord[id] = Math.max(downloaded, downloadedRecord[id] || 0)
   }
-  speedRecord[id] = Math.max(0, Math.floor(Number(speed) || 0))
+  speedRecord[id] = Math.floor(Number(speed) || 0)
   if (downloaded >= total) {
     // 清理速度显示（下载完成时隐藏）
     speedRecord[id] = 0
@@ -263,9 +267,14 @@ function formatTime(ts: number): string {
   }
 }
 
-function handleClickUrl(){
+function handleClickUrl() {
   fetch(`${BASE_URL}/gd/open-dir?path=${downloadPath.value}`)
       .then(r => r.json())
+      .then(res => {
+        if (res.code !== 0) {
+          console.error('open dir failed', res.message)
+        }
+      })
       .catch(e => alert('无法联系本地服务: ' + e))
 }
 
